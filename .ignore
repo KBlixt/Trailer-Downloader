@@ -2,3 +2,5 @@
 testdir
 venv
 config
+*(*
+*)*

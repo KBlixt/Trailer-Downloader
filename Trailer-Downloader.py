@@ -16,7 +16,7 @@ class ExtraDownloader:
         self.movie_name = ''
         self.movie_dir = ''
         self.movie_library_dir = self.config.get('SETTINGS', 'MOVIE_LIBRARY')
-        self.directory_breaker = '\\'
+        self.directory_breaker = '/'
         self.google_api_key = self.config.get('SETTINGS', 'google_api_key')
         self.official_exists = False
         self.remastered_exists = False
@@ -119,6 +119,7 @@ class ExtraDownloader:
         self.video_stream_path = os.getcwd() + self.directory_breaker + self.video_stream
         self.full_stream = extra_name + ' ' + self.movie_name + '-full'
         self.full_stream_path = os.getcwd() + self.directory_breaker + self.full_stream
+        self.temp_path = os.getcwd()
 
         max_res = 0
         for stream in yt.streams.filter(type='video').all():
@@ -150,114 +151,112 @@ class ExtraDownloader:
         for video_stream in preferable_video_streams:
             for audio_stream in preferable_audio_streams:
                 if audio_stream.itag == video_stream.itag:
-                    video_stream.download(self.movie_dir, self.full_stream)
+                    video_stream.download(self.temp_path, self.full_stream)
                     os.system('ffmpeg -i "' + self.full_stream_path + '".* '
                               '-c:v copy '
                               '-c:a copy '
                               '-threads 4 '
                               '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra()
+                    self.move_extra(extra_name)
                     return True
 
         for video_stream in preferable_video_streams:
             for audio_stream in preferable_audio_streams:
                 if audio_stream.is_adaptive and video_stream.is_adaptive:
-                    video_stream.download(self.movie_dir, self.video_stream)
-                    audio_stream.download(self.movie_dir, self.audio_stream)
+                    video_stream.download(self.temp_path, self.video_stream)
+                    audio_stream.download(self.temp_path, self.audio_stream)
                     os.system('ffmpeg -i "' + self.video_stream_path + '".* '
                               '-i "' + self.audio_stream_path + '".* '
                               '-c:v copy '
                               '-c:a copy '
                               '-threads 4 '
                               '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra()
+                    self.move_extra(extra_name)
                     return True
 
         for video_stream in preferable_video_streams:
             for audio_stream in available_audio_streams:
                 if audio_stream.itag == video_stream.itag:
-                    video_stream.download(self.movie_dir, self.full_stream)
+                    video_stream.download(self.temp_path, self.full_stream)
                     os.system('ffmpeg -i "' + self.full_stream_path + '".* '
                               '-c:v copy '
                               '-c:a aac -strict -2 -b:a 128k '
                               '-threads 4 '
                               '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra()
+                    self.move_extra(extra_name)
                     return True
 
         for video_stream in preferable_video_streams:
             for audio_stream in available_audio_streams:
                 if audio_stream.is_adaptive and video_stream.is_adaptive:
-                    video_stream.download(self.movie_dir, self.video_stream)
-                    audio_stream.download(self.movie_dir, self.audio_stream)
+                    video_stream.download(self.temp_path, self.video_stream)
+                    audio_stream.download(self.temp_path, self.audio_stream)
                     os.system('ffmpeg -i "' + self.video_stream_path + '".* '
                               '-i "' + self.audio_stream_path + '".* '
                               '-c:v copy '
                               '-c:a aac -strict -2 -b:a 128k '
                               '-threads 4 '
                               '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra()
+                    self.move_extra(extra_name)
                     return True
 
         for video_stream in available_video_streams:
             for audio_stream in preferable_audio_streams:
                 if audio_stream.itag == video_stream.itag:
-                    video_stream.download(self.movie_dir, self.full_stream)
+                    video_stream.download(self.temp_path, self.full_stream)
                     os.system('ffmpeg -i "' + self.full_stream_path + '".* '
                               '-c:v libx264 -preset slow -crf 18 '
                               '-c:a copy '
                               '-threads 4 '
                               '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra()
+                    self.move_extra(extra_name)
                     return True
 
         for video_stream in available_video_streams:
             for audio_stream in preferable_audio_streams:
                 if audio_stream.is_adaptive and video_stream.is_adaptive:
-                    video_stream.download(self.movie_dir, self.video_stream)
-                    audio_stream.download(self.movie_dir, self.audio_stream)
+                    video_stream.download(self.temp_path, self.video_stream)
+                    audio_stream.download(self.temp_path, self.audio_stream)
                     os.system('ffmpeg -i "' + self.video_stream_path + '".* '
                               '-i "' + self.audio_stream_path + '".* '
                               '-c:v libx264 -preset slow -crf 18 '
                               '-c:a copy '
                               '-threads 4 '
                               '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra()
+                    self.move_extra(extra_name)
                     return True
 
         for video_stream in available_video_streams:
             for audio_stream in available_audio_streams:
                 if audio_stream.itag == video_stream.itag:
-                    video_stream.download(self.movie_dir, self.full_stream)
+                    video_stream.download(self.temp_path, self.full_stream)
                     os.system('ffmpeg -i "' + self.full_stream_path + '".* '
                               '-c:v libx264 -preset slow -crf 18 '
                               '-c:a aac -strict -2 -b:a 128k '
                               '-threads 4 '
                               '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra()
+                    self.move_extra(extra_name)
                     return True
 
         for video_stream in available_video_streams:
             for audio_stream in available_audio_streams:
                 if audio_stream.is_adaptive and video_stream.is_adaptive:
-                    video_stream.download(self.movie_dir, self.video_stream)
-                    audio_stream.download(self.movie_dir, self.audio_stream)
+                    video_stream.download(self.temp_path, self.video_stream)
+                    audio_stream.download(self.temp_path, self.audio_stream)
                     os.system('ffmpeg -i "' + self.video_stream_path + '".* '
                               '-i "' + self.audio_stream_path + '".* '
                               '-c:v libx264 -preset slow -crf 18 '
                               '-c:a aac -strict -2 -b:a 128k '
                               '-threads 4 '
                               '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra()
+                    self.move_extra(extra_name)
                     return True
 
-    def post_process_rename(self):
-        pass
-
-
-    def move_extra(self):
+    def move_extra(self, extra_name):
 
         # move the movie to the movie directory it belongs to.
+        os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
+                  + self.movie_dir + self.directory_breaker + extra_name + ' Trailer-trailer.mp4"')
         pass
 
 
