@@ -12,7 +12,7 @@ print('Folder without a movie:')
 print('---------------------------------------------')
 for movie in os.listdir(movie_library_dir):
     printing = True
-    movie_dir = movie_library_dir + '\\' + movie
+    movie_dir = movie_library_dir + '/' + movie
     for file in os.listdir(movie_dir):
         if fnmatch.fnmatch(file, '*].mkv'):
             printing = False
