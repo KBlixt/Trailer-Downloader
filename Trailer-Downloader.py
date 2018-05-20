@@ -22,6 +22,7 @@ class ExtraDownloader:
         self.remastered_exists = False
         self.run()
 
+        self.temp_path = None
         self.audio_stream = None
         self.audio_stream_path = None
         self.video_stream = None
