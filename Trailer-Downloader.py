@@ -32,17 +32,23 @@ class ExtraDownloader:
         self.full_stream_path = None
         self.post_process_recode_audio = None
         self.post_process_recode_video = None
+        self.count = 0
 
     def run(self):
-        if self.find_movie_name():
-            if not self.official_exists:
-                self.download_extra('Official')
-            if not self.remastered_exists:
-                self.download_extra('Remaster')
 
+        for i in range(2):
+            if self.find_movie_name():
+                if not self.official_exists:
+                    self.download_extra('Official')
+                    self.count += 1
+                if not self.remastered_exists:
+                    self.download_extra('Remaster')
+                    self.count += 1
+            if self.count > 45:
+                break
         return
 
-    def find_movie_name(self):
+    def find_movie_name(self, limit):
 
         # get movie folder
         for movie in os.listdir(self.movie_library_dir):
@@ -68,9 +74,9 @@ class ExtraDownloader:
                     earlier_tries = self.config.getint('LIBRARY_RECORD', dir_config_name)
                 except configparser.NoOptionError:
                     earlier_tries = 0
-                if earlier_tries > 2:
+                if earlier_tries > limit:
                     continue
-                if earlier_tries > 0 and self.official_exists:
+                if self.official_exists and 0 != limit:
                     continue
                 earlier_tries += 1
 
@@ -117,11 +123,11 @@ class ExtraDownloader:
         pprint.pprint(yt.streams.all())
         pprint.pprint(yt.streams.filter(type='audio').all())
 
-        self.audio_stream = (extra_name + ' ' + self.movie_name + '-audio').replace("'","").replace('.','')
+        self.audio_stream = (extra_name + '-audio')
         self.audio_stream_path = os.getcwd() + self.directory_breaker + self.audio_stream
-        self.video_stream = (extra_name + ' ' + self.movie_name + '-video').replace("'","").replace('.','')
+        self.video_stream = (extra_name + '-video')
         self.video_stream_path = os.getcwd() + self.directory_breaker + self.video_stream
-        self.full_stream = (extra_name + ' ' + self.movie_name + '-full').replace("'","").replace('.','')
+        self.full_stream = (extra_name + '-full')
         self.full_stream_path = os.getcwd() + self.directory_breaker + self.full_stream
         self.temp_path = os.getcwd()
 
@@ -134,15 +140,13 @@ class ExtraDownloader:
         stream_with_max_abr = None
         max_abr = 0
         for stream in yt.streams.all():
-
             try:
                 bit_rate = int(stream.abr.replace('kbps', ''))
                 print(stream.itag + ':' + stream.abr)
             except AttributeError:
                 continue
-
             if fnmatch.fnmatch(stream.audio_codec, '*mp4a*'):
-                bit_rate = bit_rate * 1.72
+                bit_rate = bit_rate * 1.85
             if bit_rate > max_abr:
                 max_abr = bit_rate
                 stream_with_max_abr = stream
@@ -162,6 +166,7 @@ class ExtraDownloader:
             if fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
                 preferable_audio_streams.append(audio_stream)
         print(0)
+
         ########################################################################
         for video_stream in preferable_video_streams:
             for audio_stream in preferable_audio_streams:
@@ -286,14 +291,13 @@ class ExtraDownloader:
                     return True
 
     def move_extra(self, extra_name):
-
         # move the movie to the movie directory it belongs to.
-        if extra_name == 'Official' :
+        if extra_name == 'Official':
             os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
-                    + self.movie_dir + self.directory_breaker + extra_name + ' Trailer-trailer.mp4"')
+                      + self.movie_dir + self.directory_breaker + extra_name + ' Trailer-trailer.mp4"')
         elif extra_name == 'Remaster':
             os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
-                      + self.movie_dir + self.directory_breaker +'-'+ extra_name + 'ed Trailer-trailer.mp4"')
+                      + self.movie_dir + self.directory_breaker + '-' + extra_name + 'ed Trailer-trailer.mp4"')
 
         os.system('rm "' + self.video_stream_path + '".*')
         os.system('rm "' + self.audio_stream_path + '".*')
