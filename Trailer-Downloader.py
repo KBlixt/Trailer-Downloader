@@ -37,15 +37,24 @@ class ExtraDownloader:
     def run(self):
 
         for i in range(2):
-            if self.find_movie_name():
+            if self.find_movie_name(i):
                 if not self.official_exists:
                     self.download_extra('Official')
                     self.count += 1
+
                 if not self.remastered_exists:
                     self.download_extra('Remaster')
                     self.count += 1
-            if self.count > 45:
+
+                time.sleep(200)
+
+            if self.count > 0:
                 break
+
+        self.config.remove_section('MOVIE_RECORD')
+        updated_config_file = open(self.config_file, 'w')
+        self.config.write(updated_config_file)
+        updated_config_file.close()
         return
 
     def find_movie_name(self, limit):
