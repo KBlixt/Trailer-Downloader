@@ -66,7 +66,7 @@ class ExtraDownloader:
                     earlier_tries = self.config.getint('LIBRARY_RECORD', dir_config_name)
                 except configparser.NoOptionError:
                     earlier_tries = 0
-                if earlier_tries > 3:
+                if earlier_tries > 2:
                     continue
                 if earlier_tries > 0 and self.official_exists:
                     continue
@@ -127,11 +127,16 @@ class ExtraDownloader:
                 max_res = int(stream.resolution.replace('p', ''))
         max_res_str = str(max_res) + 'p'
 
+        stream_with_max_abr = None
         max_abr = 0
         for stream in yt.streams.filter(type='audio').all():
-            if int(stream.abr.replace('kbps', '')) > max_abr:
-                max_abr = int(stream.abr.replace('kbps', ''))
-        max_abr_str = str(max_abr) + 'kbps'
+            bit_rate = int(stream.abr.replace('kbps', ''))
+            if fnmatch.fnmatch(stream.audio_codec, '*mp4a*'):
+                bit_rate = bit_rate * 1.72
+            if bit_rate > max_abr:
+                max_abr = bit_rate
+                stream_with_max_abr = stream
+        max_abr_str = stream_with_max_abr.abr
 
         available_video_streams = list()
         preferable_video_streams = list()
@@ -255,9 +260,15 @@ class ExtraDownloader:
     def move_extra(self, extra_name):
 
         # move the movie to the movie directory it belongs to.
-        os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
-                  + self.movie_dir + self.directory_breaker + extra_name + ' Trailer-trailer.mp4"')
-        pass
+        if extra_name == 'Official' :
+            os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
+                    + self.movie_dir + self.directory_breaker + extra_name + ' Trailer-trailer.mp4"')
+        elif extra_name == 'Remaster':
+            os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
+                      + self.movie_dir + self.directory_breaker +'-'+ extra_name + 'ed Trailer-trailer.mp4"')
+
+        os.system('rm "' + self.video_stream_path + '".*')
+        os.system('rm "' + self.audio_stream_path + '".*')
 
 
 run = ExtraDownloader()
