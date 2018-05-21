@@ -45,8 +45,8 @@ class ExtraDownloader:
                     self.download_extra('Remaster')
                     searches_performed += 1
 
-                time.sleep(200)
-
+                time.sleep(15)
+            print(searches_performed)
             if searches_performed > 95:
                 break
 
@@ -169,7 +169,7 @@ class ExtraDownloader:
                 available_audio_streams.append(audio_stream)
                 if fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
                     preferable_audio_streams.append(audio_stream)
-            elif bit_rate > 0.65*max_abr and fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
+            elif bit_rate > 0.5*max_abr and fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
                 available_audio_streams.append(audio_stream)
 
         print(0)
@@ -313,10 +313,21 @@ class ExtraDownloader:
         elif extra_name == 'Remaster':
             os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
                       + self.movie_dir + self.directory_breaker + '-' + extra_name + 'ed Trailer-trailer.mp4"')
+        try:
+            os.system('rm "' + self.video_stream_path + '".*')
+        except Exception:
+            print('except1')
 
-        os.system('rm "' + self.video_stream_path + '".*')
-        os.system('rm "' + self.audio_stream_path + '".*')
-        os.system('rm "' + self.full_stream_path + '".*')
+        try:
+            os.system('rm "' + self.audio_stream_path + '".*')
+        except Exception:
+            print('except2')
+
+        try:
+            os.system('rm "' + self.full_stream_path + '".*')
+        except Exception:
+            print('except3')
+
 
 
 run = ExtraDownloader()
