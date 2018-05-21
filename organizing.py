@@ -1,3 +1,4 @@
+print('Starting script.')
 import os
 import configparser
 import fnmatch
@@ -6,310 +7,140 @@ import time
 
 # pip install theses vvv
 from googleapiclient.discovery import build
-from pytube import YouTube
+import pafy
 
 
-class ExtraDownloader:
-    def __init__(self, config_file='config'):
-        self.config_file = config_file
-        self.config = configparser.RawConfigParser()
-        self.config.read(config_file)
-        self.movie_name = ''
-        self.movie_dir = ''
-        self.movie_library_dir = self.config.get('SETTINGS', 'MOVIE_LIBRARY')
-        self.directory_breaker = '/'
-        self.google_api_key = self.config.get('SETTINGS', 'google_api_key')
-        self.official_exists = False
-        self.remastered_exists = False
-        self.run()
 
-        self.temp_path = None
-        self.audio_stream = None
-        self.audio_stream_path = None
-        self.video_stream = None
-        self.video_stream_path = None
-        self.full_stream = None
-        self.full_stream_path = None
-        self.post_process_recode_audio = None
-        self.post_process_recode_video = None
-        self.count = 0
 
-    def run(self):
+def get_library_record(library_dir, config):
+    library = dict()
+    for folder_name in os.listdir(library_dir):
+        if fnmatch.fnmatch(folder_name, '* (????)'):
+            temp = dict()
+            folder_name_in_config = folder_name.replace(' ', '_')
+            temp['movie_dir'] = os.getcwd() + config.get('SETTINGS', 'system_dir_changer') + folder_name
+            if not config.has_option('LIBRARY_RECORD', folder_name_in_config):
+                temp['earlier_tries'] = 0
+            else:
+                temp['earlier_tries'] = int(config.getint('LIBRARY_RECORD', folder_name_in_config))
+            library[folder_name] = temp
+    return library
 
-        for i in range(2):
-            if self.find_movie_name(i):
-                if not self.official_exists:
-                    self.download_extra('Official')
-                    self.count += 1
 
-                if not self.remastered_exists:
-                    self.download_extra('Remaster')
-                    self.count += 1
+def get_movie_folder(library, have, have_not):
 
-                time.sleep(200)
+    min_earlier_tries = 10000
+    max_earlier_tries = 0
 
-            if self.count > 0:
-                break
+    for movie in library:
+        if library[movie]['earlier_tries'] < min_earlier_tries:
+            min_earlier_tries = library[movie]['earlier_tries']
 
-        self.config.remove_section('MOVIE_RECORD')
-        updated_config_file = open(self.config_file, 'w')
-        self.config.write(updated_config_file)
-        updated_config_file.close()
-        return
+        if library[movie]['earlier_tries'] > max_earlier_tries:
+            max_earlier_tries = library[movie]['earlier_tries']
 
-    def find_movie_name(self, library_dir, config_file):
-
-        # get movie folder
-        for movie in os.listdir(self.movie_library_dir):
-            self.official_exists = False
-            self.remastered_exists = False
-            if fnmatch.fnmatch(movie, '* (????)'):
-
-                self.movie_dir = self.movie_library_dir + self.directory_breaker + movie
-                for file in os.listdir(self.movie_dir):
-                    if 'Official Trailer-trailer' in file:
-                        self.official_exists = True
-                        break
-                for file in os.listdir(self.movie_dir):
-                    if 'Remastered Trailer-trailer' in file:
-                        self.remastered_exists = True
-                        break
-
-                if self.remastered_exists and self.official_exists:
-                    continue
-
-                dir_config_name = movie.replace(' ', '_')
-                try:
-                    earlier_tries = self.config.getint('LIBRARY_RECORD', dir_config_name)
-                except configparser.NoOptionError:
-                    earlier_tries = 0
-                if earlier_tries > limit:
-                    continue
-                if self.official_exists and 0 != limit:
-                    continue
-                earlier_tries += 1
-
-                self.config.set('LIBRARY_RECORD', dir_config_name, str(earlier_tries))
-                updated_config_file = open(self.config_file, 'w')
-                self.config.write(updated_config_file)
-                updated_config_file.close()
-                self.movie_name = movie
-                return True
-
-        return False
-
-        # go through them all, locate first movie without a trailer
-
-        # parse the name for the movie name
-        pass
-
-    def download_extra(self, extra_name):
-
-        # search for movie
-        search = self.movie_name.replace('(', '').replace(')', '')
-        search = search + ' ' + extra_name + ' Trailer'
-        print(search)
-        service = build("customsearch", "v1", developerKey=self.google_api_key)
-        res = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=3).execute()
-
-        download_name = ''
-        for result in res['items']:
-            print(result['title'])
-            print(result['link'])
-
-            if extra_name.lower() in result['title'].lower():
-
-                download_name = result['link']
-
-                break
-
-        # download movie
-        # example vid: https://www.youtube.com/watch?v=3WAOxKOmR90
-        # https://www.youtube.com/watch?v=IUDTlvagjJA
-        if download_name == '':
-            return False
-        yt = YouTube(download_name)
-        pprint.pprint(yt.streams.all())
-        pprint.pprint(yt.streams.filter(type='audio').all())
-
-        self.audio_stream = (extra_name + '-audio')
-        self.audio_stream_path = os.getcwd() + self.directory_breaker + self.audio_stream
-        self.video_stream = (extra_name + '-video')
-        self.video_stream_path = os.getcwd() + self.directory_breaker + self.video_stream
-        self.full_stream = (extra_name + '-full')
-        self.full_stream_path = os.getcwd() + self.directory_breaker + self.full_stream
-        self.temp_path = os.getcwd()
-
-        max_res = 0
-        for stream in yt.streams.filter(type='video').all():
-            if int(stream.resolution.replace('p', '')) > max_res:
-                max_res = int(stream.resolution.replace('p', ''))
-        max_res_str = str(max_res) + 'p'
-
-        stream_with_max_abr = None
-        max_abr = 0
-        for stream in yt.streams.all():
-            try:
-                bit_rate = int(stream.abr.replace('kbps', ''))
-                print(stream.itag + ':' + stream.abr)
-            except AttributeError:
+    while True:
+        for movie in library:
+            if library[movie]['earlier_tries'] > min_earlier_tries:
                 continue
-            if fnmatch.fnmatch(stream.audio_codec, '*mp4a*'):
-                bit_rate = bit_rate * 1.85
-            if bit_rate > max_abr:
-                max_abr = bit_rate
-                stream_with_max_abr = stream
-        max_abr_str = stream_with_max_abr.abr
 
-        available_video_streams = list()
-        preferable_video_streams = list()
-        for video_stream in yt.streams.filter(resolution=max_res_str).all():
-            available_video_streams.append(video_stream)
-            if fnmatch.fnmatch(video_stream.video_codec.lower(), '*avc*'):
-                preferable_video_streams.append(video_stream)
+            for word in have:
+                if word not in movie.lower():
+                    continue
 
-        available_audio_streams = list()
-        preferable_audio_streams = list()
-        for audio_stream in yt.streams.filter(abr=max_abr_str).all():
-            available_audio_streams.append(audio_stream)
-            if fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
-                preferable_audio_streams.append(audio_stream)
-        print(0)
+            for word in have_not:
+                if word in movie.lower():
+                    continue
 
-        ########################################################################
-        for video_stream in preferable_video_streams:
-            for audio_stream in preferable_audio_streams:
-                if audio_stream.itag == video_stream.itag:
-                    print(video_stream.itag)
-                    print(audio_stream.itag)
-                    video_stream.download(self.temp_path, self.full_stream)
-                    time.sleep(2)
-                    os.system('ffmpeg -i "' + self.full_stream_path + '".* '
-                              '-c:v copy '
-                              '-c:a copy '
-                              '-threads 4 '
-                              '"' + self.full_stream_path + '"-rename.mp4')
+            return movie
 
-                    self.move_extra(extra_name)
-                    return True
+        if min_earlier_tries == max_earlier_tries:
+            break
 
-        for video_stream in preferable_video_streams:
-            for audio_stream in preferable_audio_streams:
-                if audio_stream.is_adaptive and video_stream.is_adaptive:
-                    print(video_stream.itag)
-                    print(audio_stream.itag)
-                    video_stream.download(self.temp_path, self.video_stream)
-                    audio_stream.download(self.temp_path, self.audio_stream)
-                    os.system('ffmpeg -i "' + self.video_stream_path + '".* '
-                              '-i "' + self.audio_stream_path + '".* '
-                              '-c:v copy '
-                              '-c:a copy '
-                              '-threads 4 '
-                              '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra(extra_name)
-                    return True
+        min_earlier_tries += 1
 
-        for video_stream in preferable_video_streams:
-            for audio_stream in available_audio_streams:
-                if audio_stream.itag == video_stream.itag:
-                    print(video_stream.itag)
-                    print(audio_stream.itag)
-                    video_stream.download(self.temp_path, self.full_stream)
-                    os.system('ffmpeg -i "' + self.full_stream_path + '".* '
-                              '-c:v copy '
-                              '-c:a aac -strict -2 -b:a 128k '
-                              '-threads 4 '
-                              '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra(extra_name)
-                    return True
-
-        for video_stream in preferable_video_streams:
-            for audio_stream in available_audio_streams:
-                if audio_stream.is_adaptive and video_stream.is_adaptive:
-                    print(video_stream.itag)
-                    print(audio_stream.itag)
-                    video_stream.download(self.temp_path, self.video_stream)
-                    audio_stream.download(self.temp_path, self.audio_stream)
-                    os.system('ffmpeg -i "' + self.video_stream_path + '".* '
-                              '-i "' + self.audio_stream_path + '".* '
-                              '-c:v copy '
-                              '-c:a aac -strict -2 -b:a 128k '
-                              '-threads 4 '
-                              '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra(extra_name)
-                    return True
-
-        for video_stream in available_video_streams:
-            for audio_stream in preferable_audio_streams:
-                if audio_stream.itag == video_stream.itag:
-                    print(video_stream.itag)
-                    print(audio_stream.itag)
-                    video_stream.download(self.temp_path, self.full_stream)
-                    os.system('ffmpeg -i "' + self.full_stream_path + '".* '
-                              '-c:v libx264 -preset slow -crf 18 '
-                              '-c:a copy '
-                              '-threads 4 '
-                              '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra(extra_name)
-                    return True
-
-        for video_stream in available_video_streams:
-            for audio_stream in preferable_audio_streams:
-                if audio_stream.is_adaptive and video_stream.is_adaptive:
-                    print(video_stream.itag)
-                    print(audio_stream.itag)
-                    video_stream.download(self.temp_path, self.video_stream)
-                    audio_stream.download(self.temp_path, self.audio_stream)
-                    os.system('ffmpeg -i "' + self.video_stream_path + '".* '
-                              '-i "' + self.audio_stream_path + '".* '
-                              '-c:v libx264 -preset slow -crf 18 '
-                              '-c:a copy '
-                              '-threads 4 '
-                              '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra(extra_name)
-                    return True
-
-        for video_stream in available_video_streams:
-            for audio_stream in available_audio_streams:
-                if audio_stream.itag == video_stream.itag:
-                    print(video_stream.itag)
-                    print(audio_stream.itag)
-                    video_stream.download(self.temp_path, self.full_stream)
-                    os.system('ffmpeg -i "' + self.full_stream_path + '".* '
-                              '-c:v libx264 -preset slow -crf 18 '
-                              '-c:a aac -strict -2 -b:a 128k '
-                              '-threads 4 '
-                              '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra(extra_name)
-                    return True
-
-        for video_stream in available_video_streams:
-            for audio_stream in available_audio_streams:
-                if audio_stream.is_adaptive and video_stream.is_adaptive:
-                    print(video_stream.itag)
-                    print(audio_stream.itag)
-                    video_stream.download(self.temp_path, self.video_stream)
-                    audio_stream.download(self.temp_path, self.audio_stream)
-                    os.system('ffmpeg -i "' + self.video_stream_path + '".* '
-                              '-i "' + self.audio_stream_path + '".* '
-                              '-c:v libx264 -preset slow -crf 18 '
-                              '-c:a aac -strict -2 -b:a 128k '
-                              '-threads 4 '
-                              '"' + self.full_stream_path + '"-rename.mp4')
-                    self.move_extra(extra_name)
-                    return True
-
-    def move_extra(self, extra_name):
-        # move the movie to the movie directory it belongs to.
-        if extra_name == 'Official':
-            os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
-                      + self.movie_dir + self.directory_breaker + extra_name + ' Trailer-trailer.mp4"')
-        elif extra_name == 'Remaster':
-            os.system('mv "' + self.full_stream_path + '-rename.mp4" "'
-                      + self.movie_dir + self.directory_breaker + '-' + extra_name + 'ed Trailer-trailer.mp4"')
-
-        os.system('rm "' + self.video_stream_path + '".*')
-        os.system('rm "' + self.audio_stream_path + '".*')
+    raise Exception("Couldn't find a movie in the library matching the given restriction")
 
 
-run = ExtraDownloader()
+def get_video_to_download(movie, added_search_term, sort_arguments, google_api_key):
+    def score_video(result, start_score, sort_arguments):
+        score = start_score
+
+        for word in sort_arguments['must_contain']:
+            if word not in result['title'].lower():
+                return 0
+
+        for word in sort_arguments['must_not_contain']:
+            if word in result['title'].lower():
+                return 0
+
+        for bonus in sort_arguments['bonuses_and_penalties']:
+            for word in sort_arguments['bonuses_and_penalties'][bonus]:
+                if word in result['title'].lower():
+                    score += bonus
+                    break
+
+    # search for movie
+    search = movie.replace('(', '').replace(')', '') + ' ' + added_search_term
+
+    service = build("customsearch", "v1", developerKey=google_api_key)
+    response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=10).execute()
+    top_score = 0
+    score = 5
+    selected_movie = None
+    for result in response['items']:
+        print(result['title'])
+        print(result['link'])
+        score_video(result, score, sort_arguments)
+        print(score)
+        score -= 1
+        if score > top_score:
+            top_score = score
+            selected_movie = result
+    if selected_movie is None:
+        raise Exception("Didn't find a good video match for the movie using given sort_arguments")
+    return selected_movie['link']
+
+
+def download(youtube_source_url, download_dir, file_name):
+    return True
+
+
+def move_and_cleanup(source_dir, file_name,  target_dir):
+    return True
+
+
+def get_official_trailer(config):
+    # Video constrains:
+
+    must_contain = ['trailer']
+    must_not_contain = []
+    bonuses_and_penalties = {2: ['hd', '1080', '...'],
+                             4: ['official'],
+                             -10: ['teaser']}
+    sort_arguments = {'must_contain': must_contain,
+                      'must_not_contain': must_not_contain,
+                      'bonuses_and_penalties': bonuses_and_penalties}
+
+    movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
+    download_dir = config.get('SETTINGS', 'download_dir')
+    system_dir_changer = config.get('SETTINGS', 'system_dir_changer')
+    google_api_key = config.get('SETTINGS', 'google_api_key')
+    print('Configuration loaded')
+
+    library = get_library_record(movie_library_dir, config)
+    print('Library loaded')
+    movie_folder = get_movie_folder(library, list(), list('*Official Trailer-trailer.*'))
+    print('Movie to process: ' + movie_folder)
+    url_to_download = get_video_to_download(movie_folder, 'Official Trailer', sort_arguments, google_api_key)
+    print('Downloading: ' + url_to_download)
+    download(url_to_download, download_dir, 'Official Trailer-trailer')
+    print('Download complete')
+    move_and_cleanup(download_dir, 'Official Trailer-trailer', movie_library_dir + system_dir_changer + movie_folder)
+    print('Move and cleanup complete')
+    return True
+
+
+config = configparser.ConfigParser()
+config.read('config')
+get_official_trailer(config)

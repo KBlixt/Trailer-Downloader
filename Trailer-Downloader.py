@@ -16,7 +16,7 @@ class ExtraDownloader:
         self.config.read(config_file)
         self.movie_name = ''
         self.movie_dir = ''
-        self.movie_library_dir = self.config.get('SETTINGS', 'MOVIE_LIBRARY')
+        self.movie_library_dir = self.config.get('SETTINGS', 'movie_library_dir')
         self.directory_breaker = '/'
         self.google_api_key = self.config.get('SETTINGS', 'google_api_key')
         self.official_exists = False
