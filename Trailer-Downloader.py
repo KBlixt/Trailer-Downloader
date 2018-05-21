@@ -34,26 +34,14 @@ class ExtraDownloader:
         self.post_process_recode_video = None
 
     def run(self):
-        searches_performed = 0
-        for i in range(2):
-            if self.find_movie_name(i):
-                if not self.official_exists:
-                    self.download_extra('Official')
-                    searches_performed += 1
 
-                if not self.remastered_exists:
-                    self.download_extra('Remaster')
-                    searches_performed += 1
+        if self.find_movie_name(1):
+            if not self.official_exists:
+                self.download_extra('Official')
 
-                time.sleep(15)
-            print(searches_performed)
-            if searches_performed > 95:
-                break
+            if not self.remastered_exists:
+                self.download_extra('Remaster')
 
-        self.config.remove_section('MOVIE_RECORD')
-        updated_config_file = open(self.config_file, 'w')
-        self.config.write(updated_config_file)
-        updated_config_file.close()
         return
 
     def find_movie_name(self, limit):
@@ -106,27 +94,55 @@ class ExtraDownloader:
 
         # search for movie
         search = self.movie_name.replace('(', '').replace(')', '')
-        search = search + ' ' + extra_name + ' Trailer'
+        if extra_name == 'Official':
+            search = search + ' Trailer'
+        else:
+            search = search + ' ' + extra_name + ' Trailer'
         print(search)
         service = build("customsearch", "v1", developerKey=self.google_api_key)
-        res = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=3).execute()
+        res = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=5).execute()
 
-        download_name = ''
+        current_top_score = None
+        current_top_name = None
+        max_score = 0
+        order = 5
+
         for result in res['items']:
             print(result['title'])
             print(result['link'])
+            download_score = order
+            order -= 1
 
-            if extra_name.lower() in result['title'].lower():
+            if extra_name == 'Official':
+                if 'hd' in result['title'].lower() \
+                        or '1080' in result['title'].lower() \
+                        or '...' in result['title'].lower():
+                    download_score += 2
+                if 'official' in result['title'].lower():
+                    download_score += 4
+                if 'teaser' in result['title'].lower():
+                    download_score += -6
 
-                download_name = result['link']
+            else:
+                if extra_name.lower() in result['title'].lower():
+                    current_top_score = result['link']
+                    current_top_name = result['title']
+                    break
+                else:
+                    continue
+            if download_score > max_score:
+                max_score = download_score
+                current_top_score = result['link']
+                current_top_name = result['title']
 
-                break
+        download_name = current_top_score
+        if current_top_score is None:
+            return False
+        print(current_top_name)
 
         # download movie
         # example vid: https://www.youtube.com/watch?v=3WAOxKOmR90
         # https://www.youtube.com/watch?v=IUDTlvagjJA
-        if download_name == '':
-            return False
         yt = YouTube(download_name)
         pprint.pprint(yt.streams.all())
 
@@ -162,7 +178,7 @@ class ExtraDownloader:
         for audio_stream in yt.streams.all():
             try:
                 bit_rate = int(audio_stream.abr.replace('kbps', ''))
-                print(audio_stream.itag + ':' + audio_stream.abr)
+                print(audio_stream.itag + ':' + audio_stream.abr + ':' + audio_stream.audio_codec)
             except AttributeError:
                 continue
             if bit_rate > 0.75*max_abr:
@@ -171,8 +187,6 @@ class ExtraDownloader:
                     preferable_audio_streams.append(audio_stream)
             elif bit_rate > 0.5*max_abr and fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
                 available_audio_streams.append(audio_stream)
-
-        print(0)
 
         ########################################################################
         for video_stream in preferable_video_streams:
