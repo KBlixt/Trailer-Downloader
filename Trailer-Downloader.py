@@ -32,23 +32,22 @@ class ExtraDownloader:
         self.full_stream_path = None
         self.post_process_recode_audio = None
         self.post_process_recode_video = None
-        self.count = 0
 
     def run(self):
-
+        searches_performed = 0
         for i in range(2):
             if self.find_movie_name(i):
                 if not self.official_exists:
                     self.download_extra('Official')
-                    self.count += 1
+                    searches_performed += 1
 
                 if not self.remastered_exists:
                     self.download_extra('Remaster')
-                    self.count += 1
+                    searches_performed += 1
 
                 time.sleep(200)
 
-            if self.count > 0:
+            if searches_performed > 95:
                 break
 
         self.config.remove_section('MOVIE_RECORD')
@@ -130,7 +129,6 @@ class ExtraDownloader:
             return False
         yt = YouTube(download_name)
         pprint.pprint(yt.streams.all())
-        pprint.pprint(yt.streams.filter(type='audio').all())
 
         self.audio_stream = (extra_name + '-audio')
         self.audio_stream_path = os.getcwd() + self.directory_breaker + self.audio_stream
@@ -146,20 +144,11 @@ class ExtraDownloader:
                 max_res = int(stream.resolution.replace('p', ''))
         max_res_str = str(max_res) + 'p'
 
-        stream_with_max_abr = None
         max_abr = 0
-        for stream in yt.streams.all():
-            try:
-                bit_rate = int(stream.abr.replace('kbps', ''))
-                print(stream.itag + ':' + stream.abr)
-            except AttributeError:
-                continue
-            if fnmatch.fnmatch(stream.audio_codec, '*mp4a*'):
-                bit_rate = bit_rate * 1.85
+        for stream in yt.streams.filter(type='audio').all():
+            bit_rate = int(stream.abr.replace('kbps', ''))
             if bit_rate > max_abr:
                 max_abr = bit_rate
-                stream_with_max_abr = stream
-        max_abr_str = stream_with_max_abr.abr
 
         available_video_streams = list()
         preferable_video_streams = list()
@@ -170,10 +159,19 @@ class ExtraDownloader:
 
         available_audio_streams = list()
         preferable_audio_streams = list()
-        for audio_stream in yt.streams.filter(abr=max_abr_str).all():
-            available_audio_streams.append(audio_stream)
-            if fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
-                preferable_audio_streams.append(audio_stream)
+        for audio_stream in yt.streams.all():
+            try:
+                bit_rate = int(audio_stream.abr.replace('kbps', ''))
+                print(audio_stream.itag + ':' + audio_stream.abr)
+            except AttributeError:
+                continue
+            if bit_rate > 0.75*max_abr:
+                available_audio_streams.append(audio_stream)
+                if fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
+                    preferable_audio_streams.append(audio_stream)
+            elif bit_rate > 0.65*max_abr and fnmatch.fnmatch(audio_stream.audio_codec.lower(), '*mp4a*'):
+                available_audio_streams.append(audio_stream)
+
         print(0)
 
         ########################################################################
@@ -182,6 +180,7 @@ class ExtraDownloader:
                 if audio_stream.itag == video_stream.itag:
                     print(video_stream.itag)
                     print(audio_stream.itag)
+                    print('case 1')
                     video_stream.download(self.temp_path, self.full_stream)
                     time.sleep(2)
                     os.system('ffmpeg -i "' + self.full_stream_path + '".* '
@@ -198,6 +197,7 @@ class ExtraDownloader:
                 if audio_stream.is_adaptive and video_stream.is_adaptive:
                     print(video_stream.itag)
                     print(audio_stream.itag)
+                    print('case 2')
                     video_stream.download(self.temp_path, self.video_stream)
                     audio_stream.download(self.temp_path, self.audio_stream)
                     os.system('ffmpeg -i "' + self.video_stream_path + '".* '
@@ -214,6 +214,7 @@ class ExtraDownloader:
                 if audio_stream.itag == video_stream.itag:
                     print(video_stream.itag)
                     print(audio_stream.itag)
+                    print('case 3')
                     video_stream.download(self.temp_path, self.full_stream)
                     os.system('ffmpeg -i "' + self.full_stream_path + '".* '
                               '-c:v copy '
@@ -228,6 +229,7 @@ class ExtraDownloader:
                 if audio_stream.is_adaptive and video_stream.is_adaptive:
                     print(video_stream.itag)
                     print(audio_stream.itag)
+                    print('case 4')
                     video_stream.download(self.temp_path, self.video_stream)
                     audio_stream.download(self.temp_path, self.audio_stream)
                     os.system('ffmpeg -i "' + self.video_stream_path + '".* '
@@ -244,6 +246,7 @@ class ExtraDownloader:
                 if audio_stream.itag == video_stream.itag:
                     print(video_stream.itag)
                     print(audio_stream.itag)
+                    print('case 5')
                     video_stream.download(self.temp_path, self.full_stream)
                     os.system('ffmpeg -i "' + self.full_stream_path + '".* '
                               '-c:v libx264 -preset slow -crf 18 '
@@ -258,6 +261,7 @@ class ExtraDownloader:
                 if audio_stream.is_adaptive and video_stream.is_adaptive:
                     print(video_stream.itag)
                     print(audio_stream.itag)
+                    print('case 6')
                     video_stream.download(self.temp_path, self.video_stream)
                     audio_stream.download(self.temp_path, self.audio_stream)
                     os.system('ffmpeg -i "' + self.video_stream_path + '".* '
@@ -274,6 +278,7 @@ class ExtraDownloader:
                 if audio_stream.itag == video_stream.itag:
                     print(video_stream.itag)
                     print(audio_stream.itag)
+                    print('case 7')
                     video_stream.download(self.temp_path, self.full_stream)
                     os.system('ffmpeg -i "' + self.full_stream_path + '".* '
                               '-c:v libx264 -preset slow -crf 18 '
@@ -288,6 +293,7 @@ class ExtraDownloader:
                 if audio_stream.is_adaptive and video_stream.is_adaptive:
                     print(video_stream.itag)
                     print(audio_stream.itag)
+                    print('case 8')
                     video_stream.download(self.temp_path, self.video_stream)
                     audio_stream.download(self.temp_path, self.audio_stream)
                     os.system('ffmpeg -i "' + self.video_stream_path + '".* '
@@ -310,6 +316,7 @@ class ExtraDownloader:
 
         os.system('rm "' + self.video_stream_path + '".*')
         os.system('rm "' + self.audio_stream_path + '".*')
+        os.system('rm "' + self.full_stream_path + '".*')
 
 
 run = ExtraDownloader()
