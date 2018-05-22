@@ -1,4 +1,4 @@
-print('Starting script.')
+
 import os
 import configparser
 import fnmatch
@@ -8,8 +8,7 @@ import time
 # pip install theses vvv
 from googleapiclient.discovery import build
 import pafy
-
-
+from pytube import YouTube
 
 
 def get_library_record(library_dir, config):
@@ -28,7 +27,6 @@ def get_library_record(library_dir, config):
 
 
 def get_movie_folder(library, have, have_not):
-
     min_earlier_tries = 10000
     max_earlier_tries = 0
 
@@ -63,40 +61,99 @@ def get_movie_folder(library, have, have_not):
 
 
 def get_video_to_download(movie, added_search_term, sort_arguments, google_api_key):
-    def score_video(result, start_score, sort_arguments):
-        score = start_score
 
-        for word in sort_arguments['must_contain']:
-            if word not in result['title'].lower():
-                return 0
+    def scan_response(response, sort_arguments):
+        start_score = 10
+        response['best_video_resolution'] = 480
 
-        for word in sort_arguments['must_not_contain']:
-            if word in result['title'].lower():
-                return 0
+        for result in response['items']:
+            video = YouTube(result['link'])
 
-        for bonus in sort_arguments['bonuses_and_penalties']:
-            for word in sort_arguments['bonuses_and_penalties'][bonus]:
+            result['title'] = result['pagemap']['videoobject'][0]['name']
+            result['scoring'] = start_score
+            start_score -= 0.9
+
+            result['true_rating'] = float(video.player_config_args['avg_rating']) \
+                                    * (1 - (1 / (int(video.player_config_args['view_count']) / 2500) ** 0.5))
+
+            try:
+                t = video.player_config_args['ad_preroll']
+                result['adds_info'] = 'have adds'
+            except Exception:
+                result['adds_info'] = 'No adds'
+
+            for stream in video.streams.filter(type='video').all():
+                result['video_resolution'] = int(stream.resolution.replace('p', ''))
+                if result['video_resolution'] > response['best_video_resolution']:
+                    response['best_video_resolution'] = int(stream.resolution.replace('p', ''))
+
+        return response
+
+    def filter_response(response, sort_arguments):
+
+        for result in response['items']:
+
+            for word in sort_arguments['must_contain']:
+                if word not in result['title'].lower():
+                    response.pop(result)
+
+            for word in sort_arguments['must_not_contain']:
                 if word in result['title'].lower():
-                    score += bonus
-                    break
+                    response.pop(result)
 
+            if 1.7 * result['video_resolution'] < response['max_video_resolution']:
+                response.pop(result)
+
+        return response
+
+    def score_response(response, sort_arguments):
+        response['max_true_rating'] = 0
+        response['min_true_rating'] = 5
+        for result in response['items']:
+            if result['true_rating'] > response['max_true_rating']:
+                response['max_true_rating'] = result['true_rating']
+            if result['true_rating'] < response['min_true_rating']:
+                response['min_true_rating'] = result['true_rating']
+
+        for result in response['items']:
+            for bonus in sort_arguments['bonuses_and_penalties']:
+                for word in sort_arguments['bonuses_and_penalties'][bonus]:
+                    if word in result['title'].lower():
+                        result['scoring'] += bonus
+                        break
+
+            result['normalized_true_rating'] = ((result['true_rating'] - response['min_true_rating'])
+                                                / (response['max_true_rating']
+                                                   - response['min_true_rating'])) * 10
+
+
+        return response
     # search for movie
     search = movie.replace('(', '').replace(')', '') + ' ' + added_search_term
-
     service = build("customsearch", "v1", developerKey=google_api_key)
-    response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=10).execute()
-    top_score = 0
-    score = 5
+    response = service.cse().list(q='The Silence of the Lambs 1991 Trailer', cx='015352570329068055865:ihmqj9sngga', num=10).execute()
+
+    # deal with the response
+    response = scan_response(response, sort_arguments)
+    response = filter_response(response, sort_arguments)
+    response = score_response(response, sort_arguments)
+
+    # select video
     selected_movie = None
+    top_score = 0
+    print('---------------------------------------------------------')
     for result in response['items']:
         print(result['title'])
+        print(result['adds_info'])
+        print(result['pagemap']['videoobject'][0]['datepublished'])
         print(result['link'])
-        score_video(result, score, sort_arguments)
-        print(score)
-        score -= 1
-        if score > top_score:
-            top_score = score
+        print(result['scoring'])
+        print(result['normalized_true_rating'])
+        print('---------------------------------------------------------')
+        if result['scoring'] > top_score:
+            top_score = result['scoring']
             selected_movie = result
+
     if selected_movie is None:
         raise Exception("Didn't find a good video match for the movie using given sort_arguments")
     return selected_movie['link']
@@ -106,18 +163,17 @@ def download(youtube_source_url, download_dir, file_name):
     return True
 
 
-def move_and_cleanup(source_dir, file_name,  target_dir):
+def move_and_cleanup(source_dir, file_name, target_dir):
     return True
 
 
 def get_official_trailer(config):
     # Video constrains:
-
     must_contain = ['trailer']
     must_not_contain = []
-    bonuses_and_penalties = {2: ['hd', '1080', '...'],
+    bonuses_and_penalties = {2: ['hd', '1080'],
                              4: ['official'],
-                             -10: ['teaser']}
+                             -10: ['teaser', 'preview']}
     sort_arguments = {'must_contain': must_contain,
                       'must_not_contain': must_not_contain,
                       'bonuses_and_penalties': bonuses_and_penalties}
@@ -131,7 +187,7 @@ def get_official_trailer(config):
     library = get_library_record(movie_library_dir, config)
     print('Library loaded')
     movie_folder = get_movie_folder(library, list(), list('*Official Trailer-trailer.*'))
-    print('Movie to process: ' + movie_folder)
+    print('Movie-trailer to download: ' + movie_folder)
     url_to_download = get_video_to_download(movie_folder, 'Official Trailer', sort_arguments, google_api_key)
     print('Downloading: ' + url_to_download)
     download(url_to_download, download_dir, 'Official Trailer-trailer')
