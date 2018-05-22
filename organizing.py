@@ -224,6 +224,9 @@ def download(youtube_video, download_dir, file_name):
                 max_resolution = resolution
                 top_video_stream = video_stream
 
+            if resolution > 1080:
+                continue
+
             if resolution > preferable_max_resolution and 'avc' in video_stream.video_codec.lower():
                 preferable_max_resolution = resolution
                 preferable_top_video_stream = video_stream
@@ -407,13 +410,16 @@ def get_remastered_trailer(config):
 config_file = 'config'
 conf = configparser.ConfigParser()
 conf.read(config_file)
-for i in range(1):
+for i in range(97):
     try:
         get_official_trailer(conf)
+        time.sleep(150)
     except HttpError as e:
         print(e)
         break
-    time.sleep(90)
+    except KeyError as eeee:
+        print(eeee)
+    time.sleep(10)
 
 with open('config', 'w') as new_config_file:
     conf.write(new_config_file)
