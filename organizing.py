@@ -51,13 +51,12 @@ def get_library_record(library_dir, config):
 
     for folder_name in os.listdir(library_dir):
         if fnmatch.fnmatch(folder_name, '* (????)'):
-
             if not config.has_option('LIBRARY_RECORD', folder_name.replace(' ', '_')):
                 new_entry = 0
             else:
-                new_entry['earlier_tries'] = int(config.getint('LIBRARY_RECORD', folder_name.replace(' ', '_')))
+                new_entry = int(config.getint('LIBRARY_RECORD', folder_name.replace(' ', '_')))
 
-                library[folder_name] = new_entry
+            library[folder_name] = new_entry
     return library
 
 
@@ -156,19 +155,22 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
 
     # deal with the response
     search_response = scan_response(search_response)
-    search_response = filter_response(search_response, sort_arguments)
+    search_response = filter_response(search_response, filter_arguments)
 
     # select video
     selected_movie = None
     top_score = 0
-    print('---------------------------------------------------------')
+
     for item in search_response['items']:
+
+        item['true_rating'] = item['avg_rating'] * (1 - 1 / ((item['view_count'] / 10) ** 0.5))
+
+        print('-----------------------------------------------------------------')
         print(item['title'])
         print(item['adds_info'])
         print(item['link'])
         print(item['true_rating'])
-        print('---------------------------------------------------------')
-        item['true_rating'] = item['avg_rating'] * (1 - 1 / ((item['view_count'] / 10) ** 0.5))
+
         if item['true_rating'] > top_score:
             top_score = item['true_rating']
             selected_movie = item
@@ -314,14 +316,16 @@ def download(youtube_video, download_dir, file_name):
             stream.resolution = '361p'
         if stream.video_codec is None:
             stream.video_codec = 'unknown'
-
+    print('---------------------------------------------------------------------------------------------------')
     print(pprint.pprint(video.streams.all()))
+    print('---------------------------------------------------------------------------------------------------')
     best_audio_stream = get_best_adaptive_audio_stream(video)
     best_video_stream = get_best_adaptive_video_stream(video)
     best_progressive_stream = get_best_progressive_stream(video)
     print(pprint.pprint(best_progressive_stream))
     print(pprint.pprint(best_video_stream))
     print(pprint.pprint(best_audio_stream))
+    print('---------------------------------------------------------------------------------------------------')
 
     if 'mp4a' in best_audio_stream.audio_codec.lower():
         best_audio_stream.abr = int(best_audio_stream.abr.replace('kbps', '')) * 1.7
@@ -353,9 +357,14 @@ def move_and_cleanup(source_dir, target_dir, file_name):
     shutil.move(os.path.join(source_dir, file_name), os.path.join(target_dir, file_name))
 
     # deleting downloaded files
-    os.remove(os.path.join(source_dir, 'audio.*'))
-    os.remove(os.path.join(source_dir, 'video.*'))
-    os.remove(os.path.join(source_dir, 'progressive.*'))
+
+    for folder_name in os.listdir(source_dir):
+        if fnmatch.fnmatch(folder_name, 'audio.*'):
+            os.remove(os.path.join(source_dir, folder_name))
+        if fnmatch.fnmatch(folder_name, 'video.*'):
+            os.remove(os.path.join(source_dir, folder_name))
+        if fnmatch.fnmatch(folder_name, 'progressive.*'):
+            os.remove(os.path.join(source_dir, folder_name))
 
 
 def get_official_trailer(config):
@@ -374,19 +383,18 @@ def get_official_trailer(config):
 
 
 def get_remastered_trailer(config):
+
     #################################################################
     # Video constrains:
     extra_name = 'Remastered Trailer-trailer'
     search_suffix = ' Trailer'
-    must_contain = ['trailer', 'remaster']
-    must_not_contain = ['teaser', 'preview']
-    bonuses_and_penalties = {2: ['hd', '1080'],
-                             4: ['remaster', 'remastered']}
+    video_name_must_contain = ['trailer', 'remaster']
+    video_name_must_not_contain = ['teaser', 'preview']
     #################################################################
 
-    sort_arguments = {'must_contain': must_contain,
-                      'must_not_contain': must_not_contain,
-                      'bonuses_and_penalties': bonuses_and_penalties}
+    sort_arguments = {'video_name_must_contain': video_name_must_contain,
+                      'video_name_must_not_contain': video_name_must_not_contain}
+
     find_extra(config, extra_name, search_suffix, sort_arguments)
 
 
