@@ -4,7 +4,6 @@ import fnmatch
 
 # pip install theses vvv
 from googleapiclient.discovery import build
-import pafy
 from pytube import YouTube
 
 
@@ -74,13 +73,10 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
             result['avg_rating'] = float(video.player_config_args['avg_rating'])
             result['view_count'] = int(video.player_config_args['view_count'])
 
-
-
-
             try:
-                t = video.player_config_args['ad_preroll']
-                result['adds_info'] = 'have adds'
-            except Exception:
+                if 'ad_preroll' in video.player_config_args:
+                    result['adds_info'] = 'have adds'
+            except ValueError:
                 result['adds_info'] = 'No adds'
 
             for stream in video.streams.filter(type='video').all():
@@ -90,15 +86,15 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
 
         return response
 
-    def filter_response(response, sort_arguments):
+    def filter_response(response, filter_arguments):
 
         for result in response['items']:
 
-            for word in sort_arguments['must_contain']:
+            for word in filter_arguments['must_contain']:
                 if word not in result['title'].lower():
                     response.pop(result)
 
-            for word in sort_arguments['must_not_contain']:
+            for word in filter_arguments['must_not_contain']:
                 if word in result['title'].lower():
                     response.pop(result)
 
@@ -107,46 +103,44 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
 
         return response
 
-    def score_response(response, sort_arguments):
+    def score_response(response, scoring_arguments):
 
         for result in response['items']:
-            for bonus in sort_arguments['bonuses_and_penalties']:
-                for word in sort_arguments['bonuses_and_penalties'][bonus]:
+            for bonus in scoring_arguments['bonuses_and_penalties']:
+                for word in scoring_arguments['bonuses_and_penalties'][bonus]:
                     if word in result['title'].lower():
                         result['scoring'] += bonus
                         break
 
             result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 15) ** 0.5))
 
-
-
         return response
 
     # search for movie
     search = movie.replace('(', '').replace(')', '') + ' ' + added_search_term
     service = build("customsearch", "v1", developerKey=google_api_key)
-    response = service.cse().list(q='The Silence of the Lambs 1991 Trailer', cx='015352570329068055865:ihmqj9sngga', num=10).execute()
+    search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=10).execute()
 
     # deal with the response
-    response = scan_response(response)
-    response = filter_response(response, sort_arguments)
-    response = score_response(response, sort_arguments)
+    search_response = scan_response(search_response)
+    search_response = filter_response(search_response, sort_arguments)
+    search_response = score_response(search_response, sort_arguments)
 
     # select video
     selected_movie = None
     top_score = 0
     print('---------------------------------------------------------')
-    for result in response['items']:
-        print(result['title'])
-        print(result['adds_info'])
-        print(result['pagemap']['videoobject'][0]['datepublished'])
-        print(result['link'])
-        print(result['scoring'])
-        print(result['true_rating'])
+    for item in search_response['items']:
+        print(item['title'])
+        print(item['adds_info'])
+        print(item['pagemap']['videoobject'][0]['datepublished'])
+        print(item['link'])
+        print(item['scoring'])
+        print(item['true_rating'])
         print('---------------------------------------------------------')
-        if result['scoring'] > top_score:
-            top_score = result['scoring']
-            selected_movie = result
+        if item['scoring'] > top_score:
+            top_score = item['scoring']
+            selected_movie = item
 
     if selected_movie is None:
         raise Exception("Didn't find a good video match for the movie using given sort_arguments")
@@ -156,58 +150,58 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
 
 def download(youtube_source_url, download_dir, file_name):
 
-    def get_best_adaptive_audio_stream(video):
+    def get_best_adaptive_audio_stream(stream_list):
 
         max_bit_rate = 50
-        top_other_audio_stream = None
-        max_preferable_bit_rate = 50
-        top_preferable_audio_stream = None
+        top_audio_stream = None
+        preferable_max_bit_rate = 50
+        preferable_top_audio_stream = None
 
-        for audio_stream in video.streams.filter(type='audio').all():
+        for audio_stream in stream_list.streams.filter(type='audio').all():
 
             bit_rate = int(audio_stream.abr.replace('kbps', ''))
 
             if bit_rate > max_bit_rate:
                 max_bit_rate = bit_rate
-                top_other_audio_stream = audio_stream
+                top_audio_stream = audio_stream
 
-            if bit_rate > max_preferable_bit_rate and 'mp4a' in audio_stream.audio_codec.lower():
-                max_preferable_bit_rate = bit_rate
-                top_preferable_audio_stream = audio_stream
+            if bit_rate > preferable_max_bit_rate and 'mp4a' in audio_stream.audio_codec.lower():
+                preferable_max_bit_rate = bit_rate
+                preferable_top_audio_stream = audio_stream
 
-        if max_preferable_bit_rate * 1.7 > max_bit_rate:
-            return top_preferable_audio_stream
+        if preferable_max_bit_rate * 1.7 > max_bit_rate:
+            return preferable_top_audio_stream
         else:
-            return top_other_audio_stream
+            return top_audio_stream
 
-    def get_best_adaptive_video_stream(video):
+    def get_best_adaptive_video_stream(stream_list):
         max_resolution = 480
-        best_video_stream = None
+        top_video_stream = None
         preferable_max_resolution = 480
-        best_preferable_video_stream = None
+        preferable_top_video_stream = None
 
-        for video_stream in video.streams.filter(type='video').all():
+        for video_stream in stream_list.streams.filter(type='video').all():
 
             resolution = int(video_stream.resolution.replace('p', ''))
 
             if resolution > max_resolution:
                 max_resolution = resolution
-                best_video_stream = video_stream
+                top_video_stream = video_stream
 
             if resolution > preferable_max_resolution and 'avc' in video_stream.video_codec.lower():
                 preferable_max_resolution = resolution
-                best_preferable_video_stream = video_stream
+                preferable_top_video_stream = video_stream
 
         if preferable_max_resolution == max_resolution:
-            return best_preferable_video_stream
+            return preferable_top_video_stream
         else:
-            return best_video_stream
+            return top_video_stream
 
-    def get_best_progressive_stream(video):
+    def get_best_progressive_stream(stream_list):
         max_resolution = 480
         selected_stream = None
         max_bit_rate = 50
-        for progressive_stream in video.streams.filter().all():
+        for progressive_stream in stream_list.streams.filter().all():
 
             resolution = int(progressive_stream.resolution.replace('p', ''))
             bit_rate = int(progressive_stream.abr.replace('kbps', ''))
@@ -218,16 +212,16 @@ def download(youtube_source_url, download_dir, file_name):
                 max_bit_rate = bit_rate
 
         max_score = 0
-        for progressive_stream in video.streams.filter().all():
+        for progressive_stream in stream_list.streams.filter().all():
             score = 0
             resolution = int(progressive_stream.resolution.replace('p', ''))
             bit_rate = int(progressive_stream.abr.replace('kbps', ''))
 
             if resolution > max_resolution:
                 score += 10000
-            if 'avc' in video_stream.video_codec.lower():
+            if 'avc' in best_video_stream.video_codec.lower():
                 score += 1000
-            if 'mp4a' in audio_stream.audio_codec.lower():
+            if 'mp4a' in best_audio_stream.audio_codec.lower():
                 score += bit_rate * 1.7
             else:
                 score += bit_rate
@@ -238,11 +232,11 @@ def download(youtube_source_url, download_dir, file_name):
 
         return selected_stream
 
-    def download_adaptive_streams(video_stream, audio_stream, download_dir, file_name):
-        video_stream.download(download_dir, 'video')
-        audio_stream.download(download_dir, 'audio')
+    def download_adaptive_streams(stream_list, audio_stream, target_dir, target_file_name):
+        stream_list.download(target_dir, 'video')
+        audio_stream.download(target_dir, 'audio')
 
-        if 'avc' in video_stream.video_codec.lower():
+        if 'avc' in stream_list.video_codec.lower():
             video_encode_parameters = 'copy'
         else:
             video_encode_parameters = 'libx264 -preset slow -crf 18'
@@ -252,15 +246,15 @@ def download(youtube_source_url, download_dir, file_name):
         else:
             audio_encode_parameters = 'aac -strict -2 -b:a 128k'
 
-        os.system('ffmpeg -i "' + os.path.join(download_dir, 'video') + '".* '
-                         '-i "' + os.path.join(download_dir, 'audio') + '".* '
+        os.system('ffmpeg -i "' + os.path.join(target_dir, 'video') + '".* '
+                         '-i "' + os.path.join(target_dir, 'audio') + '".* '
                          '-c:v ' + video_encode_parameters + ' '
                          '-c:a ' + audio_encode_parameters + ' '
                          '-threads 4 '
-                         '"' + os.path.join(download_dir, file_name) + '".mp4')
+                         '"' + os.path.join(target_dir, target_file_name) + '".mp4')
 
-    def download_progressive_streams(progressive_stream, download_dir, file_name):
-        progressive_stream.download(download_dir, 'progressive')
+    def download_progressive_streams(progressive_stream, target_dir, target_file_name):
+        progressive_stream.download(target_dir, 'progressive')
 
         if 'avc' in progressive_stream.video_codec.lower():
             video_encode_parameters = 'copy'
@@ -272,36 +266,36 @@ def download(youtube_source_url, download_dir, file_name):
         else:
             audio_encode_parameters = 'aac -strict -2 -b:a 128k'
 
-        os.system('ffmpeg -i "' + os.path.join(download_dir, 'progressive') + '".* '
+        os.system('ffmpeg -i "' + os.path.join(target_dir, 'progressive') + '".* '
                          '-c:v ' + video_encode_parameters + ' '
                          '-c:a ' + audio_encode_parameters + ' '
                          '-threads 4 '
-                         '"' + os.path.join(download_dir, file_name) + '".mp4')
+                         '"' + os.path.join(target_dir, target_file_name) + '".mp4')
 
     # decide adaptive streams to get
     video = YouTube(youtube_source_url)
 
-    audio_stream = get_best_adaptive_audio_stream(video)
-    video_stream = get_best_adaptive_video_stream(video)
-    progressive_stream = get_best_progressive_stream(video)
+    best_audio_stream = get_best_adaptive_audio_stream(video)
+    best_video_stream = get_best_adaptive_video_stream(video)
+    best_progressive_stream = get_best_progressive_stream(video)
 
-    if 'mp4a' in audio_stream.audio_codec.lower():
-        audio_stream.abr = audio_stream.abr * 1.7
-    if 'mp4a' in progressive_stream.audio_codec.lower():
-        audio_stream.abr = audio_stream.abr * 1.7
+    if 'mp4a' in best_audio_stream.audio_codec.lower():
+        best_audio_stream.abr = best_audio_stream.abr * 1.7
+    if 'mp4a' in best_progressive_stream.audio_codec.lower():
+        best_audio_stream.abr = best_audio_stream.abr * 1.7
 
     # decide to get adaptive or progressive
-    if video_stream.resolution > progressive_stream.resolution:
-        download_adaptive_streams(video_stream, audio_stream, download_dir, file_name)
+    if best_video_stream.resolution > best_progressive_stream.resolution:
+        download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
-    elif not 'avc' in progressive_stream.video_codec.lower() and 'avc' in video_stream.video_codec.lower():
-        download_adaptive_streams(video_stream, audio_stream, download_dir, file_name)
+    elif 'avc' not in best_progressive_stream.video_codec.lower() and 'avc' in best_video_stream.video_codec.lower():
+        download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
-    elif audio_stream.abr > progressive_stream.abr:
-        download_adaptive_streams(video_stream, audio_stream, download_dir, file_name)
+    elif best_audio_stream.abr > best_progressive_stream.abr:
+        download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
     else:
-        download_progressive_streams(progressive_stream, download_dir, file_name)
+        download_progressive_streams(best_progressive_stream, download_dir, file_name)
 
     return True
 
@@ -355,20 +349,20 @@ def get_official_trailer(config):
     url_to_download = get_video_to_download(movie_folder, extra_name, sort_arguments, google_api_key)
 
     print('Downloading: ' + url_to_download)
-    download(url_to_download, download_dir, extra_name)
+    download(url_to_download, download_dir, extra_name + '.mp4')
 
     print('Moving trailer and cleaning up')
-    move_and_cleanup(download_dir, extra_name, library[movie_folder]['movie_folder_dir'])
+    move_and_cleanup(download_dir, extra_name + '.mp4', library[movie_folder]['movie_folder_dir'])
 
     print('All done!')
     return True
 
 
 config_file = 'config'
-config = configparser.ConfigParser()
-config.read(config_file)
+conf = configparser.ConfigParser()
+conf.read(config_file)
 
-get_official_trailer(config)
+get_official_trailer(conf)
 
 with open('example.cfg', 'w') as new_config_file:
-    config.write(new_config_file)
+    conf.write(new_config_file)
