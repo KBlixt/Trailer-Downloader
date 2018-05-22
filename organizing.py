@@ -154,9 +154,10 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
         return response
 
     # search for movie
-    search = movie.replace('(', '').replace(')', '') + ' ' + search
+    # search = movie.replace('(', '').replace(')', '') + ' ' + search
+    search = 'The Silince of the Lambs 1991 Trailer'
     service = build("customsearch", "v1", developerKey=google_api_key)
-    search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=10).execute()
+    search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=6).execute()
 
     # deal with the response
     search_response = scan_response(search_response)
@@ -379,11 +380,10 @@ def get_remastered_trailer(config):
     # Video constrains:
     extra_name = 'Remastered Trailer-trailer'
     search_suffix = ' Trailer'
-    must_contain = ['trailer']
-    must_not_contain = []
+    must_contain = ['trailer', 'remaster']
+    must_not_contain = ['teaser', 'preview']
     bonuses_and_penalties = {2: ['hd', '1080'],
-                             4: ['remaster', 'remastered'],
-                             -10: ['teaser', 'preview']}
+                             4: ['remaster', 'remastered']}
     #################################################################
 
     sort_arguments = {'must_contain': must_contain,
