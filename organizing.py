@@ -377,10 +377,12 @@ def download(youtube_source_url, download_dir, file_name):
 def move_and_cleanup(source_dir, target_dir, file_name):
 
     # moving file
-    print('wait')
     shutil.move(os.path.join(source_dir, file_name), os.path.join(target_dir, file_name))
 
     # deleting downloaded files
+    os.remove(os.path.join(source_dir, 'audio.*'))
+    os.remove(os.path.join(source_dir, 'video.*'))
+    os.remove(os.path.join(source_dir, 'progressive.*'))
 
 
 def get_official_trailer(config):
