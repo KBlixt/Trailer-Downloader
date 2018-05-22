@@ -8,17 +8,14 @@ from googleapiclient.errors import HttpError
 from pytube import YouTube
 
 
-def execute(config, extra_name, sort_arguments):
+def execute(config, extra_name, search, sort_arguments):
 
     print('Executing for "' + extra_name + '".')
     print('Loading configuration.')
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
-    google_api_key = config.get('SETTINGS', 'google_api_key')
+    download_dir = config.get('SETTINGS', 'download_dir')
 
-    if config.has_option('SETTINGS', 'download_dir'):
-        download_dir = config.get('SETTINGS', 'download_dir')
-    else:
-        download_dir = os.getcwd()
+    google_api_key = config.get('SETTINGS', 'google_api_key')
 
     print('Loading library.')
     library = get_library_record(movie_library_dir, config)
@@ -31,7 +28,7 @@ def execute(config, extra_name, sort_arguments):
                str(library[movie_folder]['earlier_tries'] + 1))
 
     print('finding video to download for : ' + movie_folder)
-    url_to_download = get_video_to_download(movie_folder, extra_name, sort_arguments, google_api_key)
+    url_to_download = get_video_to_download(movie_folder, search, sort_arguments, google_api_key)
 
     print('Downloading: ' + url_to_download)
     download(url_to_download, download_dir, extra_name + '.mp4')
@@ -94,7 +91,7 @@ def get_movie_folder(library, have, have_not):
     raise Exception("Couldn't find a movie in the library matching the given restriction")
 
 
-def get_video_to_download(movie, added_search_term, sort_arguments, google_api_key):
+def get_video_to_download(movie, search, sort_arguments, google_api_key):
 
     def scan_response(response):
 
@@ -149,12 +146,12 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
                         result['scoring'] += bonus
                         break
 
-            result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 10) ** 0.5))
+            result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 15) ** 0.5))
 
         return response
 
     # search for movie
-    search = movie.replace('(', '').replace(')', '') + ' ' + added_search_term
+    search = movie.replace('(', '').replace(')', '') + ' ' + search
     service = build("customsearch", "v1", developerKey=google_api_key)
     search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=10).execute()
 
@@ -175,8 +172,8 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
         print(item['scoring'])
         print(item['true_rating'])
         print('---------------------------------------------------------')
-        if item['true_rating'] > top_score:
-            top_score = item['true_rating']
+        if item['scoring'] > top_score:
+            top_score = item['scoring']
             selected_movie = item
 
     if selected_movie is None:
@@ -349,32 +346,57 @@ def move_and_cleanup(source_dir, file_name, target_dir):
         try:
             if os.path.isfile(file_path):
                 os.unlink(file_path)
-        except Exception as e:
-            print(e)
+        except Exception as ee:
+            print(ee)
     return True
 
 
 def get_official_trailer(config):
-    # Video constrains:
 
-    must_contain = ['trailer']
+    #################################################################
+    # Video constrains:
     extra_name = 'Official Trailer-trailer'
+    search_suffix = ' Trailer'
+    must_contain = ['trailer']
     must_not_contain = []
     bonuses_and_penalties = {2: ['hd', '1080'],
                              4: ['official'],
                              -10: ['teaser', 'preview']}
+    #################################################################
+
     sort_arguments = {'must_contain': must_contain,
                       'must_not_contain': must_not_contain,
                       'bonuses_and_penalties': bonuses_and_penalties}
-    execute(config, extra_name, sort_arguments)
+    execute(config, extra_name, search_suffix, sort_arguments)
+
+
+def get_remastered_trailer(config):
+
+    #################################################################
+    # Video constrains:
+    extra_name = 'Remastered Trailer-trailer'
+    search_suffix = ' Trailer'
+    must_contain = ['trailer']
+    must_not_contain = []
+    bonuses_and_penalties = {2: ['hd', '1080'],
+                             4: ['remaster', 'remastered'],
+                             -10: ['teaser', 'preview']}
+    #################################################################
+
+    sort_arguments = {'must_contain': must_contain,
+                      'must_not_contain': must_not_contain,
+                      'bonuses_and_penalties': bonuses_and_penalties}
+    execute(config, extra_name, search_suffix, sort_arguments)
 
 
 config_file = 'config'
 conf = configparser.ConfigParser()
 conf.read(config_file)
+
 try:
     get_official_trailer(conf)
 except HttpError as e:
     print(e)
+
 with open('config', 'w') as new_config_file:
     conf.write(new_config_file)
