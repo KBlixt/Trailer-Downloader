@@ -99,15 +99,12 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
 
     def scan_response(response):
 
-        start_score = 10
         response['max_video_resolution'] = 0
 
         for result in response['items']:
 
             video = YouTube(result['link'])
 
-            result['scoring'] = start_score
-            start_score -= 0.9
             result['avg_rating'] = float(video.player_config_args['avg_rating'])
             result['view_count'] = int(video.player_config_args['view_count'])
 
@@ -149,11 +146,6 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
     def score_response(response, scoring_arguments):
 
         for result in response['items']:
-            for bonus in scoring_arguments['bonuses_and_penalties']:
-                for word in scoring_arguments['bonuses_and_penalties'][bonus]:
-                    if word in result['title'].lower():
-                        result['scoring'] += bonus
-                        break
 
             result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 15) ** 0.5))
 
@@ -185,7 +177,8 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
 
     if selected_movie is None:
         raise Exception("Didn't find a good video match for the movie using given sort_arguments")
-
+    if max(search_response, key=search_response['items']) == selected_movie:
+        print('#_#_#_#__#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#')
     return selected_movie['link']
 
 
@@ -308,7 +301,7 @@ def download(youtube_source_url, download_dir, file_name):
         if 'avc' in progressive_stream.video_codec.lower():
             video_encode_parameters = 'copy'
         else:
-            video_encode_parameters = 'libx264 -preset slow -crf 18'
+            video_encode_parameters = 'libx264 -preset slow -crf 17'
 
         if 'mp4a' in progressive_stream.audio_codec.lower():
             audio_encode_parameters = 'copy'
