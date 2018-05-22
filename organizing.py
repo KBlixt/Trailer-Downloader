@@ -176,8 +176,8 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
         print(item['scoring'])
         print(item['true_rating'])
         print('---------------------------------------------------------')
-        if item['scoring'] > top_score:
-            top_score = item['scoring']
+        if item['true_rating'] > top_score:
+            top_score = item['true_rating']
             selected_movie = item
 
     if selected_movie is None:
