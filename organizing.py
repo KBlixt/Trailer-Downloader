@@ -38,7 +38,7 @@ def execute(config, extra_name, search, sort_arguments):
     download(url_to_download, download_dir, extra_name + '.mp4')
 
     print('Moving trailer and cleaning up')
-    move_and_cleanup(download_dir, extra_name + '.mp4', library[movie_folder]['movie_folder_dir'])
+    move_and_cleanup(download_dir, os.path.join(movie_library_dir, movie_folder), extra_name + '.mp4')
 
     print('All done!')
     return True
@@ -103,9 +103,13 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
         response['max_video_resolution'] = 480
 
         for result in response['items']:
+
             video = YouTube(result['link'])
 
-            result['title'] = result['pagemap']['videoobject'][0]['name']
+            try:
+                result['title'] = result['pagemap']['videoobject'][0]['name']
+            except KeyError:
+                pass
             result['scoring'] = start_score
             start_score -= 0.9
             result['avg_rating'] = float(video.player_config_args['avg_rating'])
@@ -141,8 +145,6 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
                 if word in result['title'].lower():
                     continue
 
-            if 1.7 * result['video_resolution'] < response['max_video_resolution']:
-                continue
             items.append(result)
         response.pop('items')
         response['items'] = items
@@ -162,8 +164,7 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
         return response
 
     # search for movie
-    # search = movie.replace('(', '').replace(')', '') + ' ' + search
-    search = 'The Silince of the Lambs 1991 Trailer'
+    search = movie.replace('(', '').replace(')', '') + ' ' + search
     service = build("customsearch", "v1", developerKey=google_api_key)
     search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=6).execute()
 
@@ -179,7 +180,10 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
     for item in search_response['items']:
         print(item['title'])
         print(item['adds_info'])
-        print(item['pagemap']['videoobject'][0]['datepublished'])
+        try:
+            print(item['pagemap']['videoobject'][0]['datepublished'])
+        except KeyError:
+            print('Unknown')
         print(item['link'])
         print(item['scoring'])
         print(item['true_rating'])
@@ -205,6 +209,9 @@ def download(youtube_source_url, download_dir, file_name):
 
         for audio_stream in stream_list.streams.filter(type='audio').all():
 
+            if audio_stream.resolution != '361p' or audio_stream.video_codec != 'unknown':
+                continue
+
             bit_rate = int(audio_stream.abr.replace('kbps', ''))
 
             if bit_rate > max_bit_rate:
@@ -228,6 +235,9 @@ def download(youtube_source_url, download_dir, file_name):
 
         for video_stream in stream_list.streams.filter(type='video').all():
 
+            if video_stream.abr != '51kbps' or video_stream.audio_codec != 'unknown':
+                continue
+
             resolution = int(video_stream.resolution.replace('p', ''))
 
             if resolution > max_resolution:
@@ -246,13 +256,10 @@ def download(youtube_source_url, download_dir, file_name):
     def get_best_progressive_stream(stream_list):
         max_resolution = 480
         selected_stream = None
-        max_bit_rate = 50
+
         for progressive_stream in stream_list.streams.filter().all():
-            try:
-                resolution = int(progressive_stream.resolution.replace('p', ''))
-            except AttributeError:
-                progressive_stream.resolution = '0p'
-                resolution = 0
+
+            resolution = int(progressive_stream.resolution.replace('p', ''))
 
             if resolution > max_resolution:
                 max_resolution = resolution
@@ -262,17 +269,14 @@ def download(youtube_source_url, download_dir, file_name):
             score = 0
 
             resolution = int(progressive_stream.resolution.replace('p', ''))
-            try:
-                bit_rate = int(progressive_stream.abr.replace('kbps', ''))
-            except AttributeError:
-                progressive_stream.abr = '50kbps'
-                bit_rate = 50
+
+            bit_rate = int(progressive_stream.abr.replace('kbps', ''))
 
             if resolution > max_resolution:
                 score += 10000
-            if 'avc' in best_video_stream.video_codec.lower():
+            if 'avc' in progressive_stream.video_codec.lower():
                 score += 1000
-            if 'mp4a' in best_audio_stream.audio_codec.lower():
+            if 'mp4a' in progressive_stream.audio_codec.lower():
                 score += bit_rate * 1.7
             else:
                 score += bit_rate
@@ -304,7 +308,7 @@ def download(youtube_source_url, download_dir, file_name):
                          '-c:v ' + video_encode_parameters + ' '
                          '-c:a ' + audio_encode_parameters + ' '
                          '-threads 4 '
-                         '"' + os.path.join(target_dir, target_file_name) + '".mp4')
+                         '"' + os.path.join(target_dir, target_file_name) + '" -y')
 
     def download_progressive_streams(progressive_stream, target_dir, target_file_name):
         print(pprint.pprint(progressive_stream))
@@ -324,11 +328,22 @@ def download(youtube_source_url, download_dir, file_name):
                          '-c:v ' + video_encode_parameters + ' '
                          '-c:a ' + audio_encode_parameters + ' '
                          '-threads 4 '
-                         '"' + os.path.join(target_dir, target_file_name) + '".mp4')
+                         '"' + os.path.join(target_dir, target_file_name) + '" -y')
 
     # decide adaptive streams to get
     video = YouTube(youtube_source_url)
+    for stream in video.streams.all():
 
+        if stream.abr is None:
+            stream.abr = '51kbps'
+        if stream.audio_codec is None:
+            stream.audio_codec = 'unknown'
+        if stream.resolution is None:
+            stream.resolution = '361p'
+        if stream.video_codec is None:
+            stream.video_codec = 'unknown'
+
+    print(pprint.pprint(video.streams.all()))
     best_audio_stream = get_best_adaptive_audio_stream(video)
     best_video_stream = get_best_adaptive_video_stream(video)
     best_progressive_stream = get_best_progressive_stream(video)
@@ -339,7 +354,7 @@ def download(youtube_source_url, download_dir, file_name):
         best_progressive_stream.abr = int(best_progressive_stream.abr.replace('kbps', '')) * 1.7
 
     # decide to get adaptive or progressive
-    if best_video_stream.resolution > best_progressive_stream.resolution:
+    if int(best_video_stream.resolution.replace('p', '')) > int(best_progressive_stream.resolution.replace('p', '')):
         print(pprint.pprint(best_progressive_stream))
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
@@ -359,9 +374,10 @@ def download(youtube_source_url, download_dir, file_name):
     return True
 
 
-def move_and_cleanup(source_dir, file_name, target_dir):
+def move_and_cleanup(source_dir, target_dir, file_name):
 
     # moving file
+    print('wait')
     shutil.move('"' + os.path.join(source_dir, file_name) + '"', '"' + os.path.join(target_dir, file_name) + '"')
 
     # deleting downloaded files
@@ -383,6 +399,7 @@ def get_official_trailer(config):
     sort_arguments = {'must_contain': must_contain,
                       'must_not_contain': must_not_contain,
                       'bonuses_and_penalties': bonuses_and_penalties}
+
     execute(config, extra_name, search_suffix, sort_arguments)
 
 
