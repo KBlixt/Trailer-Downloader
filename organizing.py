@@ -99,7 +99,7 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
     def scan_response(response):
 
         start_score = 10
-        response['best_video_resolution'] = 480
+        response['max_video_resolution'] = 480
 
         for result in response['items']:
             video = YouTube(result['link'])
@@ -113,31 +113,38 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
             try:
                 if 'ad_preroll' in video.player_config_args:
                     result['adds_info'] = 'have adds'
+                else:
+                    result['adds_info'] = 'No adds'
             except ValueError:
                 result['adds_info'] = 'No adds'
 
+            result['video_resolution'] = 0
             for stream in video.streams.filter(type='video').all():
-                result['video_resolution'] = int(stream.resolution.replace('p', ''))
-                if result['video_resolution'] > response['best_video_resolution']:
-                    response['best_video_resolution'] = int(stream.resolution.replace('p', ''))
+                resolution = int(stream.resolution.replace('p', ''))
+                if resolution > response['max_video_resolution']:
+                    response['max_video_resolution'] = resolution
+                if resolution > result['video_resolution']:
+                    result['video_resolution'] = resolution
 
         return response
 
     def filter_response(response, filter_arguments):
-
+        items = list()
         for result in response['items']:
 
             for word in filter_arguments['must_contain']:
                 if word not in result['title'].lower():
-                    response.pop(result)
+                    continue
 
             for word in filter_arguments['must_not_contain']:
                 if word in result['title'].lower():
-                    response.pop(result)
+                    continue
 
             if 1.7 * result['video_resolution'] < response['max_video_resolution']:
-                response.pop(result)
-
+                continue
+            items.append(result)
+        response.pop('items')
+        response['items'] = items
         return response
 
     def score_response(response, scoring_arguments):
@@ -240,20 +247,25 @@ def download(youtube_source_url, download_dir, file_name):
         selected_stream = None
         max_bit_rate = 50
         for progressive_stream in stream_list.streams.filter().all():
-
-            resolution = int(progressive_stream.resolution.replace('p', ''))
-            bit_rate = int(progressive_stream.abr.replace('kbps', ''))
+            try:
+                resolution = int(progressive_stream.resolution.replace('p', ''))
+            except AttributeError:
+                progressive_stream.resolution = '0p'
+                resolution = 0
 
             if resolution > max_resolution:
                 max_resolution = resolution
-            if bit_rate > max_bit_rate:
-                max_bit_rate = bit_rate
 
         max_score = 0
         for progressive_stream in stream_list.streams.filter().all():
             score = 0
+
             resolution = int(progressive_stream.resolution.replace('p', ''))
-            bit_rate = int(progressive_stream.abr.replace('kbps', ''))
+            try:
+                bit_rate = int(progressive_stream.abr.replace('kbps', ''))
+            except AttributeError:
+                progressive_stream.abr = '50kbps'
+                bit_rate = 50
 
             if resolution > max_resolution:
                 score += 10000
@@ -318,9 +330,9 @@ def download(youtube_source_url, download_dir, file_name):
     best_progressive_stream = get_best_progressive_stream(video)
 
     if 'mp4a' in best_audio_stream.audio_codec.lower():
-        best_audio_stream.abr = best_audio_stream.abr * 1.7
+        best_audio_stream.abr = int(best_audio_stream.abr.replace('kbps', '')) * 1.7
     if 'mp4a' in best_progressive_stream.audio_codec.lower():
-        best_audio_stream.abr = best_audio_stream.abr * 1.7
+        best_progressive_stream.abr = int(best_progressive_stream.abr.replace('kbps', '')) * 1.7
 
     # decide to get adaptive or progressive
     if best_video_stream.resolution > best_progressive_stream.resolution:
@@ -344,15 +356,7 @@ def move_and_cleanup(source_dir, file_name, target_dir):
     os.system('mv "' + os.path.join(source_dir, file_name) + '" '
               '"' + os.path.join(target_dir, file_name) + '"')
 
-    # deleting everything else
-    for file in os.listdir(source_dir):
-        file_path = os.path.join(source_dir, file)
-        try:
-            if os.path.isfile(file_path):
-                os.unlink(file_path)
-        except Exception as ee:
-            print(ee)
-    return True
+    # deleting downloaded files
 
 
 def get_official_trailer(config):
