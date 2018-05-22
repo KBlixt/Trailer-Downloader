@@ -13,7 +13,10 @@ def execute(config, extra_name, search, sort_arguments):
     print('Executing for "' + extra_name + '".')
     print('Loading configuration.')
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
-    download_dir = config.get('SETTINGS', 'download_dir')
+    if config.has_option('SETTINGS', 'download_dir') and len(config.get('SETTINGS', 'download_dir')) > 2:
+        download_dir = config.get('SETTINGS', 'download_dir')
+    else:
+        download_dir = os.getcwd()
 
     google_api_key = config.get('SETTINGS', 'google_api_key')
 
