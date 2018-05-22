@@ -13,9 +13,12 @@ def execute(config, extra_name, sort_arguments):
     print('Executing for "' + extra_name + '".')
     print('Loading configuration.')
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
-    download_dir = config.get('SETTINGS', 'download_dir')
-
     google_api_key = config.get('SETTINGS', 'google_api_key')
+
+    if config.has_option('SETTINGS', 'download_dir'):
+        download_dir = config.get('SETTINGS', 'download_dir')
+    else:
+        download_dir = os.getcwd()
 
     print('Loading library.')
     library = get_library_record(movie_library_dir, config)
@@ -146,7 +149,7 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
                         result['scoring'] += bonus
                         break
 
-            result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 15) ** 0.5))
+            result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 10) ** 0.5))
 
         return response
 
@@ -172,8 +175,8 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
         print(item['scoring'])
         print(item['true_rating'])
         print('---------------------------------------------------------')
-        if item['scoring'] > top_score:
-            top_score = item['scoring']
+        if item['true_rating'] > top_score:
+            top_score = item['true_rating']
             selected_movie = item
 
     if selected_movie is None:
@@ -371,7 +374,7 @@ conf = configparser.ConfigParser()
 conf.read(config_file)
 try:
     get_official_trailer(conf)
-except HttpError:
-    pass
+except HttpError as e:
+    print(e)
 with open('config', 'w') as new_config_file:
     conf.write(new_config_file)
