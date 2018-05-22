@@ -13,6 +13,7 @@ from pytube import YouTube
 
 
 def find_extra(config, extra_name, search, sort_arguments):
+
     print('Executing for "' + extra_name + '".')
 
     print('Loading configuration.')
