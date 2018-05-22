@@ -1,7 +1,8 @@
 import os
 import configparser
 import fnmatch
-
+import pprint
+import shutil
 # pip install theses vvv
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -282,11 +283,13 @@ def download(youtube_source_url, download_dir, file_name):
 
         return selected_stream
 
-    def download_adaptive_streams(stream_list, audio_stream, target_dir, target_file_name):
-        stream_list.download(target_dir, 'video')
+    def download_adaptive_streams(video_stream, audio_stream, target_dir, target_file_name):
+        print(pprint.pprint(video_stream))
+        print(pprint.pprint(audio_stream))
+        video_stream.download(target_dir, 'video')
         audio_stream.download(target_dir, 'audio')
 
-        if 'avc' in stream_list.video_codec.lower():
+        if 'avc' in video_stream.video_codec.lower():
             video_encode_parameters = 'copy'
         else:
             video_encode_parameters = 'libx264 -preset slow -crf 18'
@@ -304,6 +307,7 @@ def download(youtube_source_url, download_dir, file_name):
                          '"' + os.path.join(target_dir, target_file_name) + '".mp4')
 
     def download_progressive_streams(progressive_stream, target_dir, target_file_name):
+        print(pprint.pprint(progressive_stream))
         progressive_stream.download(target_dir, 'progressive')
 
         if 'avc' in progressive_stream.video_codec.lower():
@@ -336,15 +340,20 @@ def download(youtube_source_url, download_dir, file_name):
 
     # decide to get adaptive or progressive
     if best_video_stream.resolution > best_progressive_stream.resolution:
+        print(pprint.pprint(best_progressive_stream))
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
     elif 'avc' not in best_progressive_stream.video_codec.lower() and 'avc' in best_video_stream.video_codec.lower():
+        print(pprint.pprint(best_progressive_stream))
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
     elif best_audio_stream.abr > best_progressive_stream.abr:
+        print(pprint.pprint(best_progressive_stream))
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
     else:
+        print(pprint.pprint(best_video_stream))
+        print(pprint.pprint(best_audio_stream))
         download_progressive_streams(best_progressive_stream, download_dir, file_name)
 
     return True
@@ -353,8 +362,7 @@ def download(youtube_source_url, download_dir, file_name):
 def move_and_cleanup(source_dir, file_name, target_dir):
 
     # moving file
-    os.system('mv "' + os.path.join(source_dir, file_name) + '" '
-              '"' + os.path.join(target_dir, file_name) + '"')
+    shutil.move('"' + os.path.join(source_dir, file_name) + '"', '"' + os.path.join(target_dir, file_name) + '"')
 
     # deleting downloaded files
 
