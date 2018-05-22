@@ -177,7 +177,7 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
 
     if selected_movie is None:
         raise Exception("Didn't find a good video match for the movie using given sort_arguments")
-    if max(search_response, key=search_response['items']) == selected_movie:
+    if max(search_response, key=search_response['items'].get) == selected_movie:
         print('#_#_#_#__#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#_#')
     return selected_movie['link']
 
