@@ -3,6 +3,7 @@ import configparser
 import fnmatch
 import pprint
 import shutil
+import time
 
 # pip install theses vvv
 from googleapiclient.discovery import build
@@ -16,28 +17,31 @@ def find_extra(config, extra_name, search, sort_arguments):
 
     print('Executing for "' + extra_name + '".')
 
+    time.sleep(1)
     print('Loading configuration.')
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
     google_api_key = config.get('SETTINGS', 'google_api_key')
-    if config.has_option('SETTINGS', 'download_dir') and len(config.get('SETTINGS', 'download_dir')) > 2:
-        download_dir = config.get('SETTINGS', 'download_dir')
-    else:
-        download_dir = os.getcwd()
+    download_dir = config.get('SETTINGS', 'download_dir') or os.getcwd()
 
+    time.sleep(1)
     print('Loading library.')
     library = get_library_record(movie_library_dir, config)
 
+    time.sleep(1)
     print('finding movie to download extra for')
     movie_folder = get_movie_folder(library, list(), list(extra_name))
 
     config.set('LIBRARY_RECORD', movie_folder.replace(' ', '_'), str(library[movie_folder] + 1))
 
+    time.sleep(1)
     print('finding video to download for : ' + movie_folder)
     video_to_download = get_video_to_download(movie_folder, search, sort_arguments, google_api_key)
 
+    time.sleep(1)
     print('Downloading: "' + video_to_download['title'] + '"')
     download(video_to_download, download_dir, extra_name + '.mp4')
 
+    time.sleep(1)
     print('Moving trailer and cleaning up')
     move_and_cleanup(download_dir, os.path.join(movie_library_dir, movie_folder), extra_name + '.mp4')
 
@@ -103,8 +107,10 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
 
         for result in response['items']:
 
+            time.sleep(1)
             video = YouTube(result['link'])
             result['youtube_object'] = video
+            time.sleep(1)
 
             result['avg_rating'] = float(video.player_config_args['avg_rating'])
             result['view_count'] = int(video.player_config_args['view_count'])
@@ -127,17 +133,17 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
 
         return response
 
-    def filter_response(response, filter_arguments):
+    def filter_response(response, arguments):
 
         items = list()
 
         for result in response['items']:
 
-            for word in filter_arguments['video_name_must_contain']:
+            for word in arguments['video_name_must_contain']:
                 if word.lower() not in result['title'].lower():
                     continue
 
-            for word in filter_arguments['video_name_must_not_contain']:
+            for word in arguments['video_name_must_not_contain']:
                 if word.lower() in result['title'].lower():
                     continue
 
@@ -401,11 +407,13 @@ def get_remastered_trailer(config):
 config_file = 'config'
 conf = configparser.ConfigParser()
 conf.read(config_file)
-
-try:
-    get_official_trailer(conf)
-except HttpError as e:
-    print(e)
+for i in range(1):
+    try:
+        get_official_trailer(conf)
+    except HttpError as e:
+        print(e)
+        break
+    time.sleep(90)
 
 with open('config', 'w') as new_config_file:
     conf.write(new_config_file)
