@@ -10,7 +10,6 @@ from pytube import YouTube
 
 
 def execute(config, extra_name, search, sort_arguments):
-
     print('Executing for "' + extra_name + '".')
     print('Loading configuration.')
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
@@ -45,7 +44,6 @@ def execute(config, extra_name, search, sort_arguments):
 
 
 def get_library_record(library_dir, config):
-
     library = dict()
     for folder_name in os.listdir(library_dir):
         if fnmatch.fnmatch(folder_name, '* (????)'):
@@ -96,7 +94,6 @@ def get_movie_folder(library, have, have_not):
 
 
 def get_video_to_download(movie, search, sort_arguments, google_api_key):
-
     def scan_response(response):
 
         start_score = 10
@@ -199,7 +196,6 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
 
 
 def download(youtube_source_url, download_dir, file_name):
-
     def get_best_adaptive_audio_stream(stream_list):
 
         max_bit_rate = 50
@@ -375,7 +371,6 @@ def download(youtube_source_url, download_dir, file_name):
 
 
 def move_and_cleanup(source_dir, target_dir, file_name):
-
     # moving file
     shutil.move(os.path.join(source_dir, file_name), os.path.join(target_dir, file_name))
 
@@ -386,7 +381,6 @@ def move_and_cleanup(source_dir, target_dir, file_name):
 
 
 def get_official_trailer(config):
-
     #################################################################
     # Video constrains:
     extra_name = 'Official Trailer-trailer'
@@ -406,7 +400,6 @@ def get_official_trailer(config):
 
 
 def get_remastered_trailer(config):
-
     #################################################################
     # Video constrains:
     extra_name = 'Remastered Trailer-trailer'
