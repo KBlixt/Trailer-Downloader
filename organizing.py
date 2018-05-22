@@ -4,10 +4,44 @@ import fnmatch
 
 # pip install theses vvv
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 from pytube import YouTube
 
 
+def execute(config, extra_name, sort_arguments):
+
+    print('Executing for "' + extra_name + '".')
+    print('Loading configuration.')
+    movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
+    download_dir = config.get('SETTINGS', 'download_dir')
+
+    google_api_key = config.get('SETTINGS', 'google_api_key')
+
+    print('Loading library.')
+    library = get_library_record(movie_library_dir, config)
+
+    print('finding movie to download extra for')
+    movie_folder = get_movie_folder(library, list(), list(extra_name))
+
+    config.set('LIBRARY_RECORD',
+               library[movie_folder]['folder_name_in_config'],
+               str(library[movie_folder]['earlier_tries'] + 1))
+
+    print('finding video to download for : ' + movie_folder)
+    url_to_download = get_video_to_download(movie_folder, extra_name, sort_arguments, google_api_key)
+
+    print('Downloading: ' + url_to_download)
+    download(url_to_download, download_dir, extra_name + '.mp4')
+
+    print('Moving trailer and cleaning up')
+    move_and_cleanup(download_dir, extra_name + '.mp4', library[movie_folder]['movie_folder_dir'])
+
+    print('All done!')
+    return True
+
+
 def get_library_record(library_dir, config):
+
     library = dict()
     for folder_name in os.listdir(library_dir):
         if fnmatch.fnmatch(folder_name, '* (????)'):
@@ -319,6 +353,7 @@ def move_and_cleanup(source_dir, file_name, target_dir):
 
 def get_official_trailer(config):
     # Video constrains:
+
     must_contain = ['trailer']
     extra_name = 'Official Trailer-trailer'
     must_not_contain = []
@@ -328,41 +363,15 @@ def get_official_trailer(config):
     sort_arguments = {'must_contain': must_contain,
                       'must_not_contain': must_not_contain,
                       'bonuses_and_penalties': bonuses_and_penalties}
-
-    print('Loading configuration.')
-    movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
-    download_dir = config.get('SETTINGS', 'download_dir')
-
-    google_api_key = config.get('SETTINGS', 'google_api_key')
-
-    print('Loading library.')
-    library = get_library_record(movie_library_dir, config)
-
-    print('finding movie to download extra for')
-    movie_folder = get_movie_folder(library, list(), list(extra_name))
-
-    config.set('LIBRARY_RECORD',
-               library[movie_folder]['folder_name_in_config'],
-               str(library[movie_folder]['earlier_tries'] + 1))
-
-    print('finding video to download for : ' + movie_folder)
-    url_to_download = get_video_to_download(movie_folder, extra_name, sort_arguments, google_api_key)
-
-    print('Downloading: ' + url_to_download)
-    download(url_to_download, download_dir, extra_name + '.mp4')
-
-    print('Moving trailer and cleaning up')
-    move_and_cleanup(download_dir, extra_name + '.mp4', library[movie_folder]['movie_folder_dir'])
-
-    print('All done!')
-    return True
+    execute(config, extra_name, sort_arguments)
 
 
 config_file = 'config'
 conf = configparser.ConfigParser()
 conf.read(config_file)
-
-get_official_trailer(conf)
-
-with open('example.cfg', 'w') as new_config_file:
+try:
+    get_official_trailer(conf)
+except HttpError:
+    pass
+with open('config', 'w') as new_config_file:
     conf.write(new_config_file)
