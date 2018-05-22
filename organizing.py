@@ -100,7 +100,7 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
     def scan_response(response):
 
         start_score = 10
-        response['max_video_resolution'] = 480
+        response['max_video_resolution'] = 0
 
         for result in response['items']:
 
@@ -378,7 +378,7 @@ def move_and_cleanup(source_dir, target_dir, file_name):
 
     # moving file
     print('wait')
-    shutil.move('"' + os.path.join(source_dir, file_name) + '"', '"' + os.path.join(target_dir, file_name) + '"')
+    shutil.move(os.path.join(source_dir, file_name), os.path.join(target_dir, file_name))
 
     # deleting downloaded files
 
