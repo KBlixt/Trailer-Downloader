@@ -1,9 +1,6 @@
-
 import os
 import configparser
 import fnmatch
-import pprint
-import time
 
 # pip install theses vvv
 from googleapiclient.discovery import build
@@ -15,14 +12,15 @@ def get_library_record(library_dir, config):
     library = dict()
     for folder_name in os.listdir(library_dir):
         if fnmatch.fnmatch(folder_name, '* (????)'):
-            temp = dict()
+            new_entry = dict()
             folder_name_in_config = folder_name.replace(' ', '_')
-            temp['movie_dir'] = os.getcwd() + config.get('SETTINGS', 'system_dir_changer') + folder_name
+            new_entry['folder_name_in_config'] = folder_name_in_config
+            new_entry['movie_folder_dir'] = os.path.join(os.getcwd(), folder_name)
             if not config.has_option('LIBRARY_RECORD', folder_name_in_config):
-                temp['earlier_tries'] = 0
+                new_entry['earlier_tries'] = 0
             else:
-                temp['earlier_tries'] = int(config.getint('LIBRARY_RECORD', folder_name_in_config))
-            library[folder_name] = temp
+                new_entry['earlier_tries'] = int(config.getint('LIBRARY_RECORD', folder_name_in_config))
+            library[folder_name] = new_entry
     return library
 
 
@@ -62,7 +60,8 @@ def get_movie_folder(library, have, have_not):
 
 def get_video_to_download(movie, added_search_term, sort_arguments, google_api_key):
 
-    def scan_response(response, sort_arguments):
+    def scan_response(response):
+
         start_score = 10
         response['best_video_resolution'] = 480
 
@@ -72,9 +71,11 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
             result['title'] = result['pagemap']['videoobject'][0]['name']
             result['scoring'] = start_score
             start_score -= 0.9
+            result['avg_rating'] = float(video.player_config_args['avg_rating'])
+            result['view_count'] = int(video.player_config_args['view_count'])
 
-            result['true_rating'] = float(video.player_config_args['avg_rating']) \
-                                    * (1 - (1 / (int(video.player_config_args['view_count']) / 2500) ** 0.5))
+
+
 
             try:
                 t = video.player_config_args['ad_preroll']
@@ -107,13 +108,6 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
         return response
 
     def score_response(response, sort_arguments):
-        response['max_true_rating'] = 0
-        response['min_true_rating'] = 5
-        for result in response['items']:
-            if result['true_rating'] > response['max_true_rating']:
-                response['max_true_rating'] = result['true_rating']
-            if result['true_rating'] < response['min_true_rating']:
-                response['min_true_rating'] = result['true_rating']
 
         for result in response['items']:
             for bonus in sort_arguments['bonuses_and_penalties']:
@@ -122,19 +116,19 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
                         result['scoring'] += bonus
                         break
 
-            result['normalized_true_rating'] = ((result['true_rating'] - response['min_true_rating'])
-                                                / (response['max_true_rating']
-                                                   - response['min_true_rating'])) * 10
+            result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 15) ** 0.5))
+
 
 
         return response
+
     # search for movie
     search = movie.replace('(', '').replace(')', '') + ' ' + added_search_term
     service = build("customsearch", "v1", developerKey=google_api_key)
     response = service.cse().list(q='The Silence of the Lambs 1991 Trailer', cx='015352570329068055865:ihmqj9sngga', num=10).execute()
 
     # deal with the response
-    response = scan_response(response, sort_arguments)
+    response = scan_response(response)
     response = filter_response(response, sort_arguments)
     response = score_response(response, sort_arguments)
 
@@ -148,7 +142,7 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
         print(result['pagemap']['videoobject'][0]['datepublished'])
         print(result['link'])
         print(result['scoring'])
-        print(result['normalized_true_rating'])
+        print(result['true_rating'])
         print('---------------------------------------------------------')
         if result['scoring'] > top_score:
             top_score = result['scoring']
@@ -156,20 +150,183 @@ def get_video_to_download(movie, added_search_term, sort_arguments, google_api_k
 
     if selected_movie is None:
         raise Exception("Didn't find a good video match for the movie using given sort_arguments")
+
     return selected_movie['link']
 
 
 def download(youtube_source_url, download_dir, file_name):
+
+    def get_best_adaptive_audio_stream(video):
+
+        max_bit_rate = 50
+        top_other_audio_stream = None
+        max_preferable_bit_rate = 50
+        top_preferable_audio_stream = None
+
+        for audio_stream in video.streams.filter(type='audio').all():
+
+            bit_rate = int(audio_stream.abr.replace('kbps', ''))
+
+            if bit_rate > max_bit_rate:
+                max_bit_rate = bit_rate
+                top_other_audio_stream = audio_stream
+
+            if bit_rate > max_preferable_bit_rate and 'mp4a' in audio_stream.audio_codec.lower():
+                max_preferable_bit_rate = bit_rate
+                top_preferable_audio_stream = audio_stream
+
+        if max_preferable_bit_rate * 1.7 > max_bit_rate:
+            return top_preferable_audio_stream
+        else:
+            return top_other_audio_stream
+
+    def get_best_adaptive_video_stream(video):
+        max_resolution = 480
+        best_video_stream = None
+        preferable_max_resolution = 480
+        best_preferable_video_stream = None
+
+        for video_stream in video.streams.filter(type='video').all():
+
+            resolution = int(video_stream.resolution.replace('p', ''))
+
+            if resolution > max_resolution:
+                max_resolution = resolution
+                best_video_stream = video_stream
+
+            if resolution > preferable_max_resolution and 'avc' in video_stream.video_codec.lower():
+                preferable_max_resolution = resolution
+                best_preferable_video_stream = video_stream
+
+        if preferable_max_resolution == max_resolution:
+            return best_preferable_video_stream
+        else:
+            return best_video_stream
+
+    def get_best_progressive_stream(video):
+        max_resolution = 480
+        selected_stream = None
+        max_bit_rate = 50
+        for progressive_stream in video.streams.filter().all():
+
+            resolution = int(progressive_stream.resolution.replace('p', ''))
+            bit_rate = int(progressive_stream.abr.replace('kbps', ''))
+
+            if resolution > max_resolution:
+                max_resolution = resolution
+            if bit_rate > max_bit_rate:
+                max_bit_rate = bit_rate
+
+        max_score = 0
+        for progressive_stream in video.streams.filter().all():
+            score = 0
+            resolution = int(progressive_stream.resolution.replace('p', ''))
+            bit_rate = int(progressive_stream.abr.replace('kbps', ''))
+
+            if resolution > max_resolution:
+                score += 10000
+            if 'avc' in video_stream.video_codec.lower():
+                score += 1000
+            if 'mp4a' in audio_stream.audio_codec.lower():
+                score += bit_rate * 1.7
+            else:
+                score += bit_rate
+
+            if score > max_score:
+                max_score = score
+                selected_stream = progressive_stream
+
+        return selected_stream
+
+    def download_adaptive_streams(video_stream, audio_stream, download_dir, file_name):
+        video_stream.download(download_dir, 'video')
+        audio_stream.download(download_dir, 'audio')
+
+        if 'avc' in video_stream.video_codec.lower():
+            video_encode_parameters = 'copy'
+        else:
+            video_encode_parameters = 'libx264 -preset slow -crf 18'
+
+        if 'mp4a' in audio_stream.audio_codec.lower():
+            audio_encode_parameters = 'copy'
+        else:
+            audio_encode_parameters = 'aac -strict -2 -b:a 128k'
+
+        os.system('ffmpeg -i "' + os.path.join(download_dir, 'video') + '".* '
+                         '-i "' + os.path.join(download_dir, 'audio') + '".* '
+                         '-c:v ' + video_encode_parameters + ' '
+                         '-c:a ' + audio_encode_parameters + ' '
+                         '-threads 4 '
+                         '"' + os.path.join(download_dir, file_name) + '".mp4')
+
+    def download_progressive_streams(progressive_stream, download_dir, file_name):
+        progressive_stream.download(download_dir, 'progressive')
+
+        if 'avc' in progressive_stream.video_codec.lower():
+            video_encode_parameters = 'copy'
+        else:
+            video_encode_parameters = 'libx264 -preset slow -crf 18'
+
+        if 'mp4a' in progressive_stream.audio_codec.lower():
+            audio_encode_parameters = 'copy'
+        else:
+            audio_encode_parameters = 'aac -strict -2 -b:a 128k'
+
+        os.system('ffmpeg -i "' + os.path.join(download_dir, 'progressive') + '".* '
+                         '-c:v ' + video_encode_parameters + ' '
+                         '-c:a ' + audio_encode_parameters + ' '
+                         '-threads 4 '
+                         '"' + os.path.join(download_dir, file_name) + '".mp4')
+
+    # decide adaptive streams to get
+    video = YouTube(youtube_source_url)
+
+    audio_stream = get_best_adaptive_audio_stream(video)
+    video_stream = get_best_adaptive_video_stream(video)
+    progressive_stream = get_best_progressive_stream(video)
+
+    if 'mp4a' in audio_stream.audio_codec.lower():
+        audio_stream.abr = audio_stream.abr * 1.7
+    if 'mp4a' in progressive_stream.audio_codec.lower():
+        audio_stream.abr = audio_stream.abr * 1.7
+
+    # decide to get adaptive or progressive
+    if video_stream.resolution > progressive_stream.resolution:
+        download_adaptive_streams(video_stream, audio_stream, download_dir, file_name)
+
+    elif not 'avc' in progressive_stream.video_codec.lower() and 'avc' in video_stream.video_codec.lower():
+        download_adaptive_streams(video_stream, audio_stream, download_dir, file_name)
+
+    elif audio_stream.abr > progressive_stream.abr:
+        download_adaptive_streams(video_stream, audio_stream, download_dir, file_name)
+
+    else:
+        download_progressive_streams(progressive_stream, download_dir, file_name)
+
     return True
 
 
 def move_and_cleanup(source_dir, file_name, target_dir):
+
+    # moving file
+    os.system('mv "' + os.path.join(source_dir, file_name) + '" '
+              '"' + os.path.join(target_dir, file_name) + '"')
+
+    # deleting everything else
+    for file in os.listdir(source_dir):
+        file_path = os.path.join(source_dir, file)
+        try:
+            if os.path.isfile(file_path):
+                os.unlink(file_path)
+        except Exception as e:
+            print(e)
     return True
 
 
 def get_official_trailer(config):
     # Video constrains:
     must_contain = ['trailer']
+    extra_name = 'Official Trailer-trailer'
     must_not_contain = []
     bonuses_and_penalties = {2: ['hd', '1080'],
                              4: ['official'],
@@ -178,25 +335,40 @@ def get_official_trailer(config):
                       'must_not_contain': must_not_contain,
                       'bonuses_and_penalties': bonuses_and_penalties}
 
+    print('Loading configuration.')
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
     download_dir = config.get('SETTINGS', 'download_dir')
-    system_dir_changer = config.get('SETTINGS', 'system_dir_changer')
-    google_api_key = config.get('SETTINGS', 'google_api_key')
-    print('Configuration loaded')
 
+    google_api_key = config.get('SETTINGS', 'google_api_key')
+
+    print('Loading library.')
     library = get_library_record(movie_library_dir, config)
-    print('Library loaded')
-    movie_folder = get_movie_folder(library, list(), list('*Official Trailer-trailer.*'))
-    print('Movie-trailer to download: ' + movie_folder)
-    url_to_download = get_video_to_download(movie_folder, 'Official Trailer', sort_arguments, google_api_key)
+
+    print('finding movie to download extra for')
+    movie_folder = get_movie_folder(library, list(), list(extra_name))
+
+    config.set('LIBRARY_RECORD',
+               library[movie_folder]['folder_name_in_config'],
+               str(library[movie_folder]['earlier_tries'] + 1))
+
+    print('finding video to download for : ' + movie_folder)
+    url_to_download = get_video_to_download(movie_folder, extra_name, sort_arguments, google_api_key)
+
     print('Downloading: ' + url_to_download)
-    download(url_to_download, download_dir, 'Official Trailer-trailer')
-    print('Download complete')
-    move_and_cleanup(download_dir, 'Official Trailer-trailer', movie_library_dir + system_dir_changer + movie_folder)
-    print('Move and cleanup complete')
+    download(url_to_download, download_dir, extra_name)
+
+    print('Moving trailer and cleaning up')
+    move_and_cleanup(download_dir, extra_name, library[movie_folder]['movie_folder_dir'])
+
+    print('All done!')
     return True
 
 
+config_file = 'config'
 config = configparser.ConfigParser()
-config.read('config')
+config.read(config_file)
+
 get_official_trailer(config)
+
+with open('example.cfg', 'w') as new_config_file:
+    config.write(new_config_file)
