@@ -106,10 +106,6 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
 
             video = YouTube(result['link'])
 
-            try:
-                result['title'] = result['pagemap']['videoobject'][0]['name']
-            except KeyError:
-                pass
             result['scoring'] = start_score
             start_score -= 0.9
             result['avg_rating'] = float(video.player_config_args['avg_rating'])
@@ -180,12 +176,7 @@ def get_video_to_download(movie, search, sort_arguments, google_api_key):
     for item in search_response['items']:
         print(item['title'])
         print(item['adds_info'])
-        try:
-            print(item['pagemap']['videoobject'][0]['datepublished'])
-        except KeyError:
-            print('Unknown')
         print(item['link'])
-        print(item['scoring'])
         print(item['true_rating'])
         print('---------------------------------------------------------')
         if item['true_rating'] > top_score:
@@ -202,9 +193,9 @@ def download(youtube_source_url, download_dir, file_name):
 
     def get_best_adaptive_audio_stream(stream_list):
 
-        max_bit_rate = 50
+        max_bit_rate = 0
         top_audio_stream = None
-        preferable_max_bit_rate = 50
+        preferable_max_bit_rate = 0
         preferable_top_audio_stream = None
 
         for audio_stream in stream_list.streams.filter(type='audio').all():
@@ -228,9 +219,9 @@ def download(youtube_source_url, download_dir, file_name):
             return top_audio_stream
 
     def get_best_adaptive_video_stream(stream_list):
-        max_resolution = 480
+        max_resolution = 0
         top_video_stream = None
-        preferable_max_resolution = 480
+        preferable_max_resolution = 0
         preferable_top_video_stream = None
 
         for video_stream in stream_list.streams.filter(type='video').all():
@@ -254,7 +245,7 @@ def download(youtube_source_url, download_dir, file_name):
             return top_video_stream
 
     def get_best_progressive_stream(stream_list):
-        max_resolution = 480
+        max_resolution = 0
         selected_stream = None
 
         for progressive_stream in stream_list.streams.filter().all():
