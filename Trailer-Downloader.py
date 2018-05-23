@@ -188,6 +188,7 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
 
     # search for movie
     search = movie.replace('(', '').replace(')', '').replace('[', '').replace(']', '') + ' ' + search_suffix
+    search.replace('.', ' ').replace('_', ' ').replace('-', ' ')
     service = build("customsearch", "v1", developerKey=google_api_key)
     search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=6).execute()
 
