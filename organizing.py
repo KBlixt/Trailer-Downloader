@@ -164,7 +164,8 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
             result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 60) ** 0.5))
 
             if result['video_resolution'] < 700:
-                result['true_rating'] *= 0.95
+                result['true_rating'] *= 0.90
+                result['view_count'] *= 0.5
 
             for bonus in scoring_arguments['video_name_tag_bonuses']:
                 for word in scoring_arguments['video_name_tag_bonuses'][bonus]:
@@ -177,7 +178,7 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
     # search for movie
     search = movie.replace('(', '').replace(')', '') + ' ' + search_suffix
     service = build("customsearch", "v1", developerKey=google_api_key)
-    search_response = service.cse().list(q='Ratatouille 2007 Trailer', cx='015352570329068055865:ihmqj9sngga', num=6).execute()
+    search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=6).execute()
 
     # deal with the response
     search_response = scan_response(search_response)
@@ -223,7 +224,7 @@ def download(youtube_video, download_dir, file_name):
         for audio_stream in stream_list.streams.filter(type='audio', progressive=False).all():
 
             if audio_stream.is_progressive \
-                    or audio_stream.resolution != '361p' \
+                    or audio_stream.resolution != '0p' \
                     or audio_stream.video_codec != 'unknown':
                 continue
 
@@ -252,7 +253,7 @@ def download(youtube_video, download_dir, file_name):
         for video_stream in stream_list.streams.filter(type='video').all():
 
             if video_stream.is_progressive \
-                    or video_stream.abr != '51kbps' \
+                    or video_stream.abr != '25kbps' \
                     or video_stream.audio_codec != 'unknown':
                 continue
 
@@ -361,11 +362,11 @@ def download(youtube_video, download_dir, file_name):
     for stream in video.streams.all():
 
         if stream.abr is None:
-            stream.abr = '51kbps'
+            stream.abr = '25kbps'
         if stream.audio_codec is None:
             stream.audio_codec = 'unknown'
         if stream.resolution is None:
-            stream.resolution = '361p'
+            stream.resolution = '0p'
         if stream.video_codec is None:
             stream.video_codec = 'unknown'
     print('---------------------------------------------------------------------------------------------------')
@@ -425,7 +426,7 @@ def get_official_trailer(config):
     extra_name = 'Official Trailer-trailer'
     search_suffix = ' Trailer'
     video_name_must_contain = ['trailer']
-    video_name_must_not_contain = []
+    video_name_must_not_contain = ['Side-by-Side', 'Side by Side', 'SidebySide']
     video_name_tag_bonuses = {
         1.01: ['official'],
         0.99: ['preview', 'teaser']
