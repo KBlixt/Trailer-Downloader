@@ -10,7 +10,7 @@ from pytube import YouTube
 
 
 class ExtraDownloader:
-    def __init__(self, config_file='config'):
+    def __init__(self, config_file='config.cfg'):
         self.config_file = config_file
         self.config = configparser.RawConfigParser()
         self.config.read(config_file)

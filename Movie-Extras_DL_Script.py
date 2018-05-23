@@ -1,11 +1,11 @@
 import os
-import configparser
+import ConfigParser
 import fnmatch
 import pprint
 import shutil
 import time
 
-# pip install theses vvv
+# pip install these packages:
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from pytube import YouTube
@@ -22,6 +22,7 @@ def find_extra(config, extra_name, search, sort_arguments):
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
     google_api_key = config.get('SETTINGS', 'google_api_key')
     download_dir = config.get('SETTINGS', 'download_dir') or os.getcwd()
+    ffmpeg_status = config.getboolean('SETTINGS', 'FFmpeg_installed')
 
     time.sleep(1)
     print('Loading library.')
@@ -39,7 +40,7 @@ def find_extra(config, extra_name, search, sort_arguments):
 
     time.sleep(1)
     print('Downloading: "' + video_to_download['title'] + '"')
-    download(video_to_download, download_dir, extra_name)
+    download(video_to_download, download_dir, extra_name, ffmpeg_status)
 
     time.sleep(1)
     print('Moving "' + extra_name + '" and cleaning up')
@@ -54,7 +55,7 @@ def get_library_record(library_dir, config):
     library = dict()
 
     for folder_name in os.listdir(library_dir):
-        if fnmatch.fnmatch(folder_name, '* (????)'):
+        if fnmatch.fnmatch(folder_name, config.get('SETTINGS', 'name_pattern')):
             if not config.has_option('LIBRARY_RECORD', folder_name.replace(' ', '_')):
                 new_entry = 0
             else:
@@ -107,10 +108,20 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
 
         for result in response['items']:
 
-            time.sleep(1)
-            video = YouTube(result['link'])
+            video = None
+            for try_count in range(5):
+                time.sleep(1)
+                if try_count > 3:
+                    video = YouTube(result['link'])
+                else:
+                    try:
+                        video = YouTube(result['link'])
+                        break
+                    except KeyError:
+                        print('pytube failed to initialize. trying again in 10 seconds.')
+                        time.sleep(10)
+
             result['youtube_object'] = video
-            time.sleep(1)
 
             result['avg_rating'] = float(video.player_config_args['avg_rating'])
             result['view_count'] = int(video.player_config_args['view_count'])
@@ -213,7 +224,7 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
     return selected_movie
 
 
-def download(youtube_video, download_dir, file_name):
+def download(youtube_video, download_dir, file_name, ffmpeg_status):
     def get_best_adaptive_audio_stream(stream_list):
 
         max_bit_rate = 0
@@ -293,7 +304,9 @@ def download(youtube_video, download_dir, file_name):
             score = 0
             resolution = int(progressive_stream.resolution.replace('p', ''))
             bit_rate = int(progressive_stream.abr.replace('kbps', ''))
-
+            if not ffmpeg_status:
+                if progressive_stream.subtype.lower() == 'mp4':
+                    score += 1000000000
             if resolution == max_resolution:
                 score += 10000
             if 'avc' in progressive_stream.video_codec.lower():
@@ -386,7 +399,10 @@ def download(youtube_video, download_dir, file_name):
         best_progressive_stream.abr = int(best_progressive_stream.abr.replace('kbps', '')) * 1.7
 
     # decide to get adaptive or progressive
-    if int(best_video_stream.resolution.replace('p', '')) > int(best_progressive_stream.resolution.replace('p', '')):
+    if not ffmpeg_status:
+        download_progressive_streams(best_progressive_stream, download_dir, file_name)
+        print('Picked the progressive streams because the ffmpeg_installed setting is false.')
+    elif int(best_video_stream.resolution.replace('p', '')) > int(best_progressive_stream.resolution.replace('p', '')):
         print('Picked the adaptive streams because of higher video resolution.')
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
@@ -431,7 +447,6 @@ def get_official_trailer(config):
         1.01: ['official'],
         0.99: ['preview', 'teaser']
     }
-
     #################################################################
 
     filter_arguments = {'video_name_must_contain': video_name_must_contain,
@@ -446,34 +461,45 @@ def get_remastered_trailer(config):
     #################################################################
     # Video constrains:
     extra_name = 'Remastered Trailer-trailer'
-    search_suffix = ' Trailer'
+    search_suffix = ' Remastered Trailer'
     video_name_must_contain = ['trailer', 'remaster']
-    video_name_must_not_contain = ['teaser', 'preview']
+    video_name_must_not_contain = ['Side-by-Side', 'Side by Side', 'SidebySide']
+    video_name_tag_bonuses = {
+        0.8: ['preview', 'teaser'],
+        1.05: ['fan']
+    }
     #################################################################
 
-    sort_arguments = {'video_name_must_contain': video_name_must_contain,
-                      'video_name_must_not_contain': video_name_must_not_contain}
+    filter_arguments = {'video_name_must_contain': video_name_must_contain,
+                        'video_name_must_not_contain': video_name_must_not_contain,
+                        'video_name_tag_bonuses': video_name_tag_bonuses}
 
-    find_extra(config, extra_name, search_suffix, sort_arguments)
+    find_extra(config, extra_name, search_suffix, filter_arguments)
 
 
-config_file = 'config'
-conf = configparser.ConfigParser()
+config_file = 'config.cfg'
+conf = ConfigParser.ConfigParser()
 
-for i in range(97):
+while True:
     try:
         conf.read(config_file)
+        if conf.getboolean('SETTINGS', 'search_for_remastered'):
+            get_remastered_trailer(conf)
+        else:
+            get_official_trailer(conf)
 
-        get_official_trailer(conf)
-
-        with open('config', 'w') as new_config_file:
+        with open(config_file, 'w') as new_config_file:
             conf.write(new_config_file)
             new_config_file.close()
 
-        time.sleep(150)
+        time.sleep(conf.getint('SETTINGS', 'cooldown'))
+
     except HttpError as e:
         print(e)
+        print('No more API requests available.')
+        print('Try again tomorrow after midnight GMT -(8:00/-7:00)')
         break
-    except KeyError as eeee:
-        print(eeee)
+    except KeyError as error:
+        print(error)
+        print('pytube failed to initialize after 3 attempts, try again at a later date.')
     time.sleep(10)

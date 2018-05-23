@@ -3,7 +3,7 @@ import fnmatch
 import configparser
 
 config = configparser.RawConfigParser()
-config.read('config')
+config.read('config.cfg')
 movie_library_dir = config.get('SETTINGS', 'MOVIE_LIBRARY')
 
 print('---------------------------------------------')
