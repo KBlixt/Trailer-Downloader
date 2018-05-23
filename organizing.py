@@ -325,7 +325,8 @@ def download(youtube_video, download_dir, file_name):
         print('Picked the progressive stream.')
 
         if progressive_stream.subtype.lower() == 'mp4':
-            progressive_stream.download(target_dir, target_file_name)
+            progressive_stream.download(target_dir, target_file_name + '.mp4')
+            return
         else:
             progressive_stream.download(target_dir, 'progressive')
 
