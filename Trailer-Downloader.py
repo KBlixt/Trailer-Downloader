@@ -4,10 +4,9 @@ import fnmatch
 import pprint
 import shutil
 import time
-
+import sys
 # pip install these packages:
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+from googlesearch import search as google_search
 from pytube import YouTube
 
 # also, install FFmpeg.
@@ -20,7 +19,7 @@ def find_extra(config, extra_name, search, sort_arguments):
     time.sleep(1)
     print('Loading configuration.')
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
-    google_api_key = config.get('SETTINGS', 'google_api_key')
+
     download_dir = config.get('SETTINGS', 'download_dir') or os.getcwd()
     ffmpeg_status = config.getboolean('SETTINGS', 'FFmpeg_installed')
 
@@ -30,13 +29,13 @@ def find_extra(config, extra_name, search, sort_arguments):
 
     time.sleep(1)
     print('finding movie to download extra for')
-    movie_folder = get_movie_folder(library, list(), list(extra_name))
+    movie_folder = get_movie_folder(movie_library_dir, library, [], [extra_name])
 
     config.set('LIBRARY_RECORD', movie_folder.replace(' ', '_'), str(library[movie_folder] + 1))
 
     time.sleep(1)
     print('finding video to download for : ' + movie_folder)
-    video_to_download = get_video_to_download(movie_folder, search, sort_arguments, google_api_key)
+    video_to_download = get_video_to_download(movie_folder, search, sort_arguments)
 
     time.sleep(1)
     print('Downloading: "' + video_to_download['title'] + '"')
@@ -65,7 +64,7 @@ def get_library_record(library_dir, config):
     return library
 
 
-def get_movie_folder(earlier_tries, have, have_not):
+def get_movie_folder(library_dir, earlier_tries, have, have_not):
 
     min_earlier_tries = 10000
     max_earlier_tries = 0
@@ -81,15 +80,18 @@ def get_movie_folder(earlier_tries, have, have_not):
         for movie in earlier_tries:
             if earlier_tries[movie] > min_earlier_tries:
                 continue
+            should_continue = False
+            for file_name in os.listdir(os.path.join(library_dir, movie)):
+                for word in have:
+                    if word not in file_name:
+                        should_continue = True
 
-            for word in have:
-                if word not in movie.lower():
-                    continue
-
-            for word in have_not:
-                if word in movie.lower():
-                    continue
-
+            for file_name in os.listdir(os.path.join(library_dir, movie)):
+                for word in have_not:
+                    if word in file_name:
+                        should_continue = True
+            if should_continue:
+                continue
             return movie
 
         if min_earlier_tries >= max_earlier_tries:
@@ -97,10 +99,13 @@ def get_movie_folder(earlier_tries, have, have_not):
 
         min_earlier_tries += 1
 
-    raise Exception("Couldn't find a movie in the library matching the given restriction")
+    print("Couldn't find a movie in the library matching the given restriction.")
+    print("Or all movies already have the extra you are looking for.")
+    print('Shutting down.')
+    sys.exit()
 
 
-def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key):
+def get_video_to_download(movie, search_suffix, filter_arguments):
 
     def scan_response(response):
 
@@ -122,9 +127,12 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
                         time.sleep(10)
 
             result['youtube_object'] = video
-
+            result['title'] = video.title
             result['avg_rating'] = float(video.player_config_args['avg_rating'])
             result['view_count'] = int(video.player_config_args['view_count'])
+
+            if result['view_count'] < 60:
+                result['view_count'] = 60
 
             result['video_resolution'] = 0
             for stream in video.streams.filter(type='video').all():
@@ -182,17 +190,22 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
                 for word in scoring_arguments['video_name_tag_bonuses'][bonus]:
                     if word in result['title'].lower():
                         result['true_rating'] *= bonus
+                        result['view_count'] *= bonus
                         break
 
         return response
 
     # search for movie
     search = movie.replace('(', '').replace(')', '').replace('[', '').replace(']', '') + ' ' + search_suffix
-    search.replace('.', ' ').replace('_', ' ').replace('-', ' ')
-    service = build("customsearch", "v1", developerKey=google_api_key)
-    search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=6).execute()
+    search = search.replace('.', ' ').replace('_', ' ').replace('-', ' ')
+    search = str('site:youtube.com ' + search)
 
-    # deal with the response
+    item_list = list()
+    for url in google_search(search, stop=10):
+        test = {'link': url}
+        item_list.append(test)
+    search_response = {'items': item_list}
+
     search_response = scan_response(search_response)
     search_response = filter_response(search_response, filter_arguments)
     search_response = score_response(search_response, filter_arguments)
@@ -347,7 +360,7 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
 
     def download_progressive_streams(progressive_stream, target_dir, target_file_name):
 
-        print('Picked the progressive stream.')
+
 
         if progressive_stream.subtype.lower() == 'mp4':
             progressive_stream.download(target_dir, target_file_name)
@@ -401,8 +414,9 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
 
     # decide to get adaptive or progressive
     if not ffmpeg_status:
-        download_progressive_streams(best_progressive_stream, download_dir, file_name)
         print('Picked the progressive streams because the ffmpeg_installed setting is false.')
+        download_progressive_streams(best_progressive_stream, download_dir, file_name)
+
     elif int(best_video_stream.resolution.replace('p', '')) > int(best_progressive_stream.resolution.replace('p', '')):
         print('Picked the adaptive streams because of higher video resolution.')
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
@@ -416,6 +430,7 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
     else:
+        print('Picked the progressive stream.')
         download_progressive_streams(best_progressive_stream, download_dir, file_name)
 
     return
@@ -495,12 +510,7 @@ while True:
 
         time.sleep(conf.getint('SETTINGS', 'cooldown'))
 
-    except HttpError as e:
-        print(e)
-        print('No more API requests available.')
-        print('Try again tomorrow after midnight GMT -(8:00/-7:00)')
-        break
-    except KeyError as error:
+    except ValueError as error:
         print(error)
         print('pytube failed to initialize after 3 attempts, try again at a later date.')
     time.sleep(10)
