@@ -110,7 +110,6 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
     def scan_response(response):
 
         response['max_video_resolution'] = 0
-
         for result in response['items']:
 
             video = None
