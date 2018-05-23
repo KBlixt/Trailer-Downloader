@@ -42,7 +42,7 @@ def find_extra(config, extra_name, search, sort_arguments):
     download(video_to_download, download_dir, extra_name + '.mp4')
 
     time.sleep(1)
-    print('Moving trailer and cleaning up')
+    print('Moving "' + extra_name + '" and cleaning up')
     move_and_cleanup(download_dir, os.path.join(movie_library_dir, movie_folder), extra_name + '.mp4')
 
     print('All done!')
@@ -139,18 +139,38 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
 
         for result in response['items']:
 
+            append_video = True
+
             for word in arguments['video_name_must_contain']:
                 if word.lower() not in result['title'].lower():
-                    continue
+                    append_video = False
 
             for word in arguments['video_name_must_not_contain']:
                 if word.lower() in result['title'].lower():
-                    continue
+                    append_video = False
 
-            items.append(result)
+            if append_video:
+                items.append(result)
 
         response.pop('items')
         response['items'] = items
+
+        return response
+
+    def score_response(response, scoring_arguments):
+
+        for result in response['items']:
+
+            result['true_rating'] = result['avg_rating'] * (1 - 1 / ((result['view_count'] / 60) ** 0.5))
+
+            if result['video_resolution'] < 700:
+                result['true_rating'] *= 0.95
+
+            for bonus in scoring_arguments['video_name_tag_bonuses']:
+                for word in scoring_arguments['video_name_tag_bonuses'][bonus]:
+                    if word in result['title'].lower():
+                        result['true_rating'] *= bonus
+                        break
 
         return response
 
@@ -162,24 +182,32 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
     # deal with the response
     search_response = scan_response(search_response)
     search_response = filter_response(search_response, filter_arguments)
+    search_response = score_response(search_response, filter_arguments)
 
     # select video
     selected_movie = None
+
     top_score = 0
+    top_view_count = 0
 
     for item in search_response['items']:
-
-        item['true_rating'] = item['avg_rating'] * (1 - 1 / ((item['view_count'] / 10) ** 0.5))
 
         print('-----------------------------------------------------------------')
         print(item['title'])
         print(item['adds_info'])
+        print(item['video_resolution'])
         print(item['link'])
         print(item['true_rating'])
+        print(item['view_count'])
 
         if item['true_rating'] > top_score:
             top_score = item['true_rating']
-            selected_movie = item
+
+    for item in search_response['items']:
+        if item['true_rating'] > top_score * 0.95:
+            if item['view_count'] > top_view_count:
+                top_view_count = item['view_count']
+                selected_movie = item
 
     return selected_movie
 
@@ -295,7 +323,11 @@ def download(youtube_video, download_dir, file_name):
     def download_progressive_streams(progressive_stream, target_dir, target_file_name):
 
         print('Picked the progressive stream.')
-        progressive_stream.download(target_dir, 'progressive')
+
+        if progressive_stream.subtype.lower() == 'mp4':
+            progressive_stream.download(target_dir, target_file_name)
+        else:
+            progressive_stream.download(target_dir, 'progressive')
 
         if 'avc' in progressive_stream.video_codec.lower():
             video_encode_parameters = 'copy'
@@ -350,7 +382,7 @@ def download(youtube_video, download_dir, file_name):
         print('Picked the adaptive streams because of better video codec.')
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
-    elif best_audio_stream.abr > best_progressive_stream.abr:
+    elif best_audio_stream.abr > best_progressive_stream.abr * 1.1:
         print('Picked the adaptive streams because of better audio.')
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
@@ -383,10 +415,16 @@ def get_official_trailer(config):
     search_suffix = ' Trailer'
     video_name_must_contain = ['trailer']
     video_name_must_not_contain = []
+    video_name_tag_bonuses = {
+        1.01: ['official'],
+        0.99: ['preview', 'teaser']
+    }
+
     #################################################################
 
     filter_arguments = {'video_name_must_contain': video_name_must_contain,
-                        'video_name_must_not_contain': video_name_must_not_contain}
+                        'video_name_must_not_contain': video_name_must_not_contain,
+                        'video_name_tag_bonuses': video_name_tag_bonuses}
 
     find_extra(config, extra_name, search_suffix, filter_arguments)
 
@@ -409,10 +447,17 @@ def get_remastered_trailer(config):
 
 config_file = 'config'
 conf = configparser.ConfigParser()
-conf.read(config_file)
+
 for i in range(97):
     try:
+        conf.read(config_file)
+
         get_official_trailer(conf)
+
+        with open('config', 'w') as new_config_file:
+            conf.write(new_config_file)
+            new_config_file.close()
+
         time.sleep(150)
     except HttpError as e:
         print(e)
@@ -420,6 +465,3 @@ for i in range(97):
     except KeyError as eeee:
         print(eeee)
     time.sleep(10)
-
-with open('config', 'w') as new_config_file:
-    conf.write(new_config_file)
