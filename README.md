@@ -66,4 +66,4 @@ also. this script could probably be used to download other extras like interview
 need that for now. 
 
 I made the script mainly for usage within plex. so turning it into some kind of plex plugin or hooking it up agianst the
-plex Database would probably enhance the capabilities.
+plex Database would probably enhance the capabilities. like not searching by folder name and actually get the propper name.
