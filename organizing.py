@@ -15,7 +15,7 @@ from pytube import YouTube
 
 def find_extra(config, extra_name, search, sort_arguments):
 
-    print('Executing for "' + extra_name + '".')
+    print('Finding video for extra: "' + extra_name + '".')
 
     time.sleep(1)
     print('Loading configuration.')
@@ -39,7 +39,7 @@ def find_extra(config, extra_name, search, sort_arguments):
 
     time.sleep(1)
     print('Downloading: "' + video_to_download['title'] + '"')
-    download(video_to_download, download_dir, extra_name + '.mp4')
+    download(video_to_download, download_dir, extra_name)
 
     time.sleep(1)
     print('Moving "' + extra_name + '" and cleaning up')
@@ -177,7 +177,7 @@ def get_video_to_download(movie, search_suffix, filter_arguments, google_api_key
     # search for movie
     search = movie.replace('(', '').replace(')', '') + ' ' + search_suffix
     service = build("customsearch", "v1", developerKey=google_api_key)
-    search_response = service.cse().list(q=search, cx='015352570329068055865:ihmqj9sngga', num=6).execute()
+    search_response = service.cse().list(q='Ratatouille 2007 Trailer', cx='015352570329068055865:ihmqj9sngga', num=6).execute()
 
     # deal with the response
     search_response = scan_response(search_response)
@@ -222,6 +222,11 @@ def download(youtube_video, download_dir, file_name):
 
         for audio_stream in stream_list.streams.filter(type='audio', progressive=False).all():
 
+            if audio_stream.is_progressive \
+                    or audio_stream.resolution != '361p' \
+                    or audio_stream.video_codec != 'unknown':
+                continue
+
             bit_rate = int(audio_stream.abr.replace('kbps', ''))
 
             if bit_rate > max_bit_rate:
@@ -244,7 +249,12 @@ def download(youtube_video, download_dir, file_name):
         preferable_max_resolution = 0
         preferable_top_video_stream = None
 
-        for video_stream in stream_list.streams.filter(type='video', progressive=False).all():
+        for video_stream in stream_list.streams.filter(type='video').all():
+
+            if video_stream.is_progressive \
+                    or video_stream.abr != '51kbps' \
+                    or video_stream.audio_codec != 'unknown':
+                continue
 
             resolution = int(video_stream.resolution.replace('p', ''))
 
@@ -318,14 +328,14 @@ def download(youtube_video, download_dir, file_name):
                          '-c:v ' + video_encode_parameters + ' '
                          '-c:a ' + audio_encode_parameters + ' '
                          '-threads 4 '
-                         '"' + os.path.join(target_dir, target_file_name) + '" -y')
+                         '"' + os.path.join(target_dir, target_file_name + '.mp4') + '" -y')
 
     def download_progressive_streams(progressive_stream, target_dir, target_file_name):
 
         print('Picked the progressive stream.')
 
         if progressive_stream.subtype.lower() == 'mp4':
-            progressive_stream.download(target_dir, target_file_name + '.mp4')
+            progressive_stream.download(target_dir, target_file_name)
             return
         else:
             progressive_stream.download(target_dir, 'progressive')
@@ -344,7 +354,7 @@ def download(youtube_video, download_dir, file_name):
                          '-c:v ' + video_encode_parameters + ' '
                          '-c:a ' + audio_encode_parameters + ' '
                          '-threads 4 '
-                         '"' + os.path.join(target_dir, target_file_name) + '" -y')
+                         '"' + os.path.join(target_dir, target_file_name + '.mp4') + '" -y')
 
     # decide adaptive streams to get
     video = youtube_video['youtube_object']
@@ -383,7 +393,7 @@ def download(youtube_video, download_dir, file_name):
         print('Picked the adaptive streams because of better video codec.')
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
-    elif best_audio_stream.abr > best_progressive_stream.abr * 1.1:
+    elif best_audio_stream.abr > best_progressive_stream.abr * 0.9:
         print('Picked the adaptive streams because of better audio.')
         download_adaptive_streams(best_video_stream, best_audio_stream, download_dir, file_name)
 
