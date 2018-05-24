@@ -204,9 +204,9 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
         test = {'link': url}
         item_list.append(test)
     count = 0
-    for url in item_list:
-        if count > 6:
-            item_list.remove(url)
+    item_list.pop()
+    item_list.pop()
+    item_list.pop()
     search_response = {'items': item_list}
 
     search_response = scan_response(search_response)
