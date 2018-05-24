@@ -200,9 +200,13 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
     search = str('site:youtube.com ' + search)
 
     item_list = list()
-    for url in google_search(search, stop=7):
+    for url in google_search(search, stop=10):
         test = {'link': url}
         item_list.append(test)
+    count = 0
+    for url in item_list:
+        if count > 6:
+            item_list.remove(url)
     search_response = {'items': item_list}
 
     search_response = scan_response(search_response)
