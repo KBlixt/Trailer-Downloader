@@ -180,6 +180,9 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
 
             append_video = True
 
+            if result['delete_this_item']:
+                continue
+
             for word in arguments['video_name_must_contain']:
                 if word.lower() not in result['title'].lower():
                     append_video = False
@@ -187,9 +190,6 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
             for word in arguments['video_name_must_not_contain']:
                 if word.lower() in result['title'].lower():
                     append_video = False
-
-            if result['delete_this_item']:
-                append_video = False
 
             if append_video:
                 items.append(result)
