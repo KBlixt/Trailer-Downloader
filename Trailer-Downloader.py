@@ -5,10 +5,10 @@ import pprint
 import shutil
 import time
 import sys
-# pip install these packages:
-from googlesearch import search as google_search
-from pytube import YouTube
 
+# pip install these packages:
+from googlesearch import search as google_search  # google package
+from pytube import YouTube  # pytube package
 # also, install FFmpeg.
 
 
