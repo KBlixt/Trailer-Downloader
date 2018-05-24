@@ -351,15 +351,13 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
             audio_encode_parameters = 'aac -strict -2 -b:a 128k'
 
         os.system('ffmpeg -i "' + os.path.join(target_dir, 'video') + '".* '
-                         '-i "' + os.path.join(target_dir, 'audio') + '".* '
-                         '-c:v ' + video_encode_parameters + ' '
-                         '-c:a ' + audio_encode_parameters + ' '
-                         '-threads 4 '
-                         '"' + os.path.join(target_dir, target_file_name + '.mp4') + '" -y')
+                  '-i "' + os.path.join(target_dir, 'audio') + '".* '
+                  '-c:v ' + video_encode_parameters + ' '
+                  '-c:a ' + audio_encode_parameters + ' '
+                  '-threads 4 '
+                  '"' + os.path.join(target_dir, target_file_name + '.mp4') + '" -y')
 
     def download_progressive_streams(progressive_stream, target_dir, target_file_name):
-
-
 
         if progressive_stream.subtype.lower() == 'mp4':
             progressive_stream.download(target_dir, target_file_name)
@@ -378,10 +376,10 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
             audio_encode_parameters = 'aac -strict -2 -b:a 128k'
 
         os.system('ffmpeg -i "' + os.path.join(target_dir, 'progressive') + '".* '
-                         '-c:v ' + video_encode_parameters + ' '
-                         '-c:a ' + audio_encode_parameters + ' '
-                         '-threads 4 '
-                         '"' + os.path.join(target_dir, target_file_name + '.mp4') + '" -y')
+                  '-c:v ' + video_encode_parameters + ' '
+                  '-c:a ' + audio_encode_parameters + ' '
+                  '-threads 4 '
+                  '"' + os.path.join(target_dir, target_file_name + '.mp4') + '" -y')
 
     # decide adaptive streams to get
     video = youtube_video['youtube_object']
