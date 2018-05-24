@@ -1,4 +1,5 @@
 import os
+from os import path
 import ConfigParser
 import fnmatch
 import pprint
@@ -448,7 +449,7 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
 def move_and_cleanup(source_dir, target_dir, file_name):
 
     # moving file
-    if not os.path.join(target_dir, file_name).is_file():
+    if not os.path.isfile(os.path.join(target_dir, file_name)):
         shutil.move(os.path.join(source_dir, file_name), os.path.join(target_dir, file_name))
     else:
         os.remove(os.path.join(source_dir, file_name))
