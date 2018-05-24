@@ -138,7 +138,6 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
                 try:
                     resolution = int(stream.resolution.replace('p', ''))
                 except AttributeError:
-                    print('something went wrong')
                     resolution = 0
 
                 if resolution > response['max_video_resolution']:
