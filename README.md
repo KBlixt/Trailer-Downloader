@@ -31,8 +31,7 @@ pip install pytube
 pip install google
 ```
 
-Then you can run it. it will run until you stop it or you reach your api request limit which is 100 for free api keys.
-Or at least I think so since that's where mine start complaining.
+Then you can run it. it will run until you stop it.
 
 ```sh
 python /path/to/script/Trailer-Downloader
