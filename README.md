@@ -44,7 +44,7 @@ movie_name release_year
 
 "movie_name" is the name of the movie and "release_year" is the year the movie was released.
 ".", "-" and "\_" as delimiters in stead of spaces is ok. 
-paranthesis and square brackets will be removed entirely.
+parenthesis and square brackets will be removed entirely.
 
 ### FFmpeg and encoding
 
@@ -65,5 +65,5 @@ sudo apt-get install ffmpeg
 also. this script could probably be used to download other extras like interviews and behind the scenes. but I don't 
 need that for now. 
 
-I made the script mainly for usage within plex. so turning it into some kind of plex plugin or hooking it up agianst the
-plex Database would probably enhance the capabilities. like not searching by folder name and actually get the propper name.
+I made the script mainly for usage within plex. so turning it into some kind of plex plugin or hooking it up against the
+plex Database would probably enhance the capabilities. like not searching by folder name and actually get the popper name.
