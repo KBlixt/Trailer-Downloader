@@ -11,6 +11,7 @@ from urllib2 import URLError
 # pip install these packages:
 from googlesearch import search as google_search  # google package
 from pytube import YouTube  # pytube package
+from pytube import exceptions
 # also, install FFmpeg.
 
 
@@ -117,6 +118,8 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
         response['max_video_resolution'] = 0
         for result in response['items']:
 
+            result['delete_this_item'] = False
+
             video = None
             for try_count in range(5):
                 time.sleep(1)
@@ -127,11 +130,17 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
                         video = YouTube(result['link'])
                         break
                     except KeyError:
-                        print('pytube failed to initialize. trying again in 10 seconds.')
+                        print('Pytube failed to initialize. trying again in 10 seconds.')
                         time.sleep(10)
                     except URLError:
-                        print('pytube failed to initialize. trying again in 10 seconds.')
+                        print('Pytube failed to initialize. trying again in 10 seconds.')
                         time.sleep(10)
+                    except exceptions.RegexMatchError:
+                        result['delete_this_item'] = True
+                        break
+
+            if result['delete_this_item']:
+                continue
 
             result['youtube_object'] = video
             result['title'] = video.title
@@ -178,6 +187,9 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
             for word in arguments['video_name_must_not_contain']:
                 if word.lower() in result['title'].lower():
                     append_video = False
+
+            if result['delete_this_item']:
+                append_video = False
 
             if append_video:
                 items.append(result)
