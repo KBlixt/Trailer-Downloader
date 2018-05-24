@@ -1,6 +1,6 @@
 import os
-from os import path
 import ConfigParser
+from ConfigParser import NoOptionError
 import fnmatch
 import pprint
 import shutil
@@ -21,8 +21,10 @@ def find_extra(config, extra_name, search, sort_arguments):
     time.sleep(1)
     print('Loading configuration.')
     movie_library_dir = config.get('SETTINGS', 'movie_library_dir')
-
-    download_dir = config.get('SETTINGS', 'download_dir') or os.getcwd()
+    try:
+        download_dir = config.get('SETTINGS', 'download_dir')
+    except NoOptionError:
+        download_dir = os.getcwd()
     ffmpeg_status = config.getboolean('SETTINGS', 'FFmpeg_installed')
 
     time.sleep(1)
