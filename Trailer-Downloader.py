@@ -38,7 +38,7 @@ def find_extra(config, extra_name, search, sort_arguments):
     video_to_download = get_video_to_download(movie_folder, search, sort_arguments)
 
     time.sleep(1)
-    print('Downloading: "' + video_to_download['title'] + '"')
+    print('Downloading: "' + video_to_download['title'] + '" (' + video_to_download['link'] + ")")
     download(video_to_download, download_dir, extra_name, ffmpeg_status)
 
     time.sleep(1)
