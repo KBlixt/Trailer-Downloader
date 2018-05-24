@@ -203,7 +203,6 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
     for url in google_search(search, stop=10):
         test = {'link': url}
         item_list.append(test)
-    count = 0
     item_list.pop()
     item_list.pop()
     item_list.pop()
