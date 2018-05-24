@@ -1,6 +1,6 @@
 # Trailer-Downloader
 
-This script will go through your movie library and search for trailer on youtube and download the best one (hopefully).
+This script will go through your movie library and search for a trailer on youtube and download the best one (hopefully).
 The script requires that you have a ordered library. Most preferably if you've named them "movie_name year".
 Using parentheses or brackets around the year is alright.
 
@@ -12,8 +12,6 @@ hen the script will download the trailer with the most views that are within 5% 
 it also take into consideration the resolution of the video somewhat.
 
 it will put the trailer in the movie folder and call it "Official Trailer-trailer.mp4"
-
-
 
 
 ### Installation
@@ -61,7 +59,7 @@ sudo apt-get install ffmpeg
 
 ### expanding the script
 
-also. this script could probably be used to download other extras like interviews and behind the scenes. but I don't 
+This script could probably be used to download other extras like interviews and behind the scenes. but I don't
 need that for now. 
 
 I made the script mainly for usage within plex. so turning it into some kind of plex plugin or hooking it up against the
