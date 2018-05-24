@@ -77,26 +77,27 @@ def get_movie_folder(library_dir, earlier_tries, have, have_not):
         if earlier_tries[movie] > max_earlier_tries:
             max_earlier_tries = earlier_tries[movie]
 
-    while True:
+    while min_earlier_tries <= max_earlier_tries:
+
         for movie in earlier_tries:
+
             if earlier_tries[movie] > min_earlier_tries:
                 continue
-            should_continue = False
+
+            return_movie = True
+
             for file_name in os.listdir(os.path.join(library_dir, movie)):
                 for word in have:
                     if word not in file_name:
-                        should_continue = True
+                        return_movie = False
 
             for file_name in os.listdir(os.path.join(library_dir, movie)):
                 for word in have_not:
                     if word in file_name:
-                        should_continue = True
-            if should_continue:
-                continue
-            return movie
+                        return_movie = False
 
-        if min_earlier_tries >= max_earlier_tries:
-            break
+            if return_movie:
+                return movie
 
         min_earlier_tries += 1
 
@@ -447,8 +448,10 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
 def move_and_cleanup(source_dir, target_dir, file_name):
 
     # moving file
-    shutil.move(os.path.join(source_dir, file_name), os.path.join(target_dir, file_name))
-
+    if not os.path.join(target_dir, file_name).is_file():
+        shutil.move(os.path.join(source_dir, file_name), os.path.join(target_dir, file_name))
+    else:
+        os.remove(os.path.join(source_dir, file_name))
     # deleting downloaded files
 
     for folder_name in os.listdir(source_dir):
