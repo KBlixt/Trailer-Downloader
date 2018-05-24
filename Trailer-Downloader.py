@@ -5,6 +5,7 @@ import pprint
 import shutil
 import time
 import sys
+from urllib2 import URLError
 
 # pip install these packages:
 from googlesearch import search as google_search  # google package
@@ -122,6 +123,9 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
                         video = YouTube(result['link'])
                         break
                     except KeyError:
+                        print('pytube failed to initialize. trying again in 10 seconds.')
+                        time.sleep(10)
+                    except URLError:
                         print('pytube failed to initialize. trying again in 10 seconds.')
                         time.sleep(10)
 
