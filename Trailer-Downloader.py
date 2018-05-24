@@ -204,13 +204,13 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
 
     # search for movie
     search = movie.replace('(', '').replace(')', '').replace('[', '').replace(']', '') + ' ' + search_suffix
-    search = search.replace('.', ' ').replace('_', ' ').replace('-', ' ')
+    search = search.replace('.', ' ').replace('_', ' ').replace('-', ' ').replace('  ', ' ').replace('  ', ' ')
     search = str('site:youtube.com ' + search)
 
     item_list = list()
     for url in google_search(search, stop=10):
-        test = {'link': url}
-        item_list.append(test)
+        item = {'link': url}
+        item_list.append(item)
     item_list.pop()
     item_list.pop()
     item_list.pop()
