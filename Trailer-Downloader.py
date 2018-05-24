@@ -135,7 +135,12 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
 
             result['video_resolution'] = 0
             for stream in video.streams.filter(type='video').all():
-                resolution = int(stream.resolution.replace('p', ''))
+                try:
+                    resolution = int(stream.resolution.replace('p', ''))
+                except AttributeError:
+                    print('something went wrong')
+                    resolution = 0
+
                 if resolution > response['max_video_resolution']:
                     response['max_video_resolution'] = resolution
                 if resolution > result['video_resolution']:
