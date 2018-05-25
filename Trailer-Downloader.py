@@ -41,7 +41,6 @@ def find_extra(config, extra_name, search, sort_arguments):
     time.sleep(1)
     print('finding video to download for : ' + movie_folder)
     video_to_download = get_video_to_download(movie_folder, search, sort_arguments)
-
     time.sleep(1)
     print('Downloading: "' + video_to_download['title'] + '" (' + video_to_download['link'] + ")")
     download(video_to_download, download_dir, extra_name, ffmpeg_status)
@@ -122,19 +121,20 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
 
             video = None
             for try_count in range(5):
-                time.sleep(1)
-                if try_count > 3:
+
+                if try_count > 2:
+                    time.sleep(1)
                     video = YouTube(result['link'])
                 else:
                     try:
                         video = YouTube(result['link'])
                         break
                     except KeyError:
-                        print('Pytube failed to initialize. trying again in 10 seconds.')
-                        time.sleep(10)
+                        print('Pytube failed to initialize (KeyError). trying again in 10 seconds.')
+                        time.sleep(9)
                     except URLError:
-                        print('Pytube failed to initialize. trying again in 10 seconds.')
-                        time.sleep(10)
+                        print('Pytube failed to initialize (URLError). trying again in 10 seconds.')
+                        time.sleep(9)
                     except exceptions.RegexMatchError:
                         result['delete_this_item'] = True
                         break
@@ -224,9 +224,21 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
     search = str('site:youtube.com ' + search)
 
     item_list = list()
-    for url in google_search(search, stop=10):
-        item = {'link': url}
-        item_list.append(item)
+    for attempt in range(5):
+        if attempt > 2:
+            for url in google_search(search, stop=10):
+                item = {'link': url}
+                item_list.append(item)
+        else:
+            try:
+                for url in google_search(search, stop=10):
+                    item = {'link': url}
+                    item_list.append(item)
+            except URLError:
+                print('Failed to retrieve search results, trying again in 10 seconds')
+                time.sleep(10)
+                continue
+
     item_list.pop()
     item_list.pop()
     item_list.pop()
