@@ -229,11 +229,13 @@ def get_video_to_download(movie, search_suffix, filter_arguments):
             for url in google_search(search, stop=10):
                 item = {'link': url}
                 item_list.append(item)
+            break
         else:
             try:
                 for url in google_search(search, stop=10):
                     item = {'link': url}
                     item_list.append(item)
+                break
             except URLError:
                 print('Failed to retrieve search results, trying again in 10 seconds')
                 time.sleep(10)
