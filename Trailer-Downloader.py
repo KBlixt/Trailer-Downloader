@@ -1,12 +1,12 @@
 import os
-import ConfigParser
-from ConfigParser import NoOptionError
+import configparser
+from configparser import NoOptionError
 import fnmatch
 import pprint
 import shutil
 import time
 import sys
-from urllib2 import URLError
+from urllib.error import URLError
 
 # pip install these packages:
 from googlesearch import search as google_search  # google package
@@ -532,7 +532,7 @@ def get_remastered_trailer(config):
 
 
 config_file = 'config.cfg'
-conf = ConfigParser.ConfigParser()
+conf = configparser.ConfigParser()
 
 while True:
     try:

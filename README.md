@@ -29,10 +29,10 @@ pip install pytube
 pip install google
 ```
 
-Then you can run it. it will run until you stop it.
+Then you can run it with python3. it will run until you stop it.
 
 ```sh
-python /path/to/script/Trailer-Downloader
+python3 /path/to/script/Trailer-Downloader
 ```
 
 ### folder naming scheme required for the script:
