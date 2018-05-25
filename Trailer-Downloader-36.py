@@ -9,7 +9,11 @@ import sys
 from urllib.error import URLError
 
 # pip install these packages:
-from googlesearch import search as google_search  # google package
+try:
+    from googlesearch import search as google_search  # google package
+except ImportError:
+    print('Please upgrade to python 3.6 or run the 2.7 version.')
+    sys.exit()
 from pytube import YouTube  # pytube package
 from pytube import exceptions
 # also, install FFmpeg.
