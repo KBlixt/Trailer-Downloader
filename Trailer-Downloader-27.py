@@ -378,8 +378,31 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
 
     def download_adaptive_streams(video_stream, audio_stream, target_dir, target_file_name):
 
-        video_stream.download(target_dir, 'video')
-        audio_stream.download(target_dir, 'audio')
+        for attempt in range(5):
+            if attempt > 2:
+                video_stream.download(target_dir, 'video')
+                break
+            else:
+                try:
+                    video_stream.download(target_dir, 'video')
+                    break
+                except URLError:
+                    print('Failed to download video stream, trying again in 10 seconds')
+                    time.sleep(10)
+                    continue
+
+        for attempt in range(5):
+            if attempt > 2:
+                audio_stream.download(target_dir, 'audio')
+                break
+            else:
+                try:
+                    audio_stream.download(target_dir, 'audio')
+                    break
+                except URLError:
+                    print('Failed to download audio stream, trying again in 10 seconds')
+                    time.sleep(10)
+                    continue
 
         if 'avc' in video_stream.video_codec.lower():
             video_encode_parameters = 'copy'
@@ -401,10 +424,34 @@ def download(youtube_video, download_dir, file_name, ffmpeg_status):
     def download_progressive_streams(progressive_stream, target_dir, target_file_name):
 
         if progressive_stream.subtype.lower() == 'mp4':
-            progressive_stream.download(target_dir, target_file_name)
+
+            for attempt in range(5):
+                if attempt > 2:
+                    progressive_stream.download(target_dir, target_file_name)
+                    break
+                else:
+                    try:
+                        progressive_stream.download(target_dir, target_file_name)
+                        break
+                    except URLError:
+                        print('Failed to download progressive stream, trying again in 10 seconds')
+                        time.sleep(10)
+                        continue
             return
         else:
-            progressive_stream.download(target_dir, 'progressive')
+
+            for attempt in range(5):
+                if attempt > 2:
+                    progressive_stream.download(target_dir, 'progressive')
+                    break
+                else:
+                    try:
+                        progressive_stream.download(target_dir, 'progressive')
+                        break
+                    except URLError:
+                        print('Failed to download progressive stream, trying again in 10 seconds')
+                        time.sleep(10)
+                        continue
 
         if 'avc' in progressive_stream.video_codec.lower():
             video_encode_parameters = 'copy'
