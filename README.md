@@ -49,8 +49,8 @@ parenthesis and square brackets will be removed entirely.
 
 ### FFmpeg and encoding
 
-if you want to get 1080p streams then you'll have to get FFmpeg. this is because for some reason youtube stores their
-audio/video streams separately for some reason. if this is enable then the script will make sure that you end up with a
+if you want to get 1080p streams then you'll have to get FFmpeg. this is because youtube stores their
+audio/video streams separately for some reason. if this is enabled then the script will make sure that you end up with a
 trailer that uses h.264 and AAC in a mp4 container. it might encode if it finds higher resolutions that isn't in h.264.
 
 install by
