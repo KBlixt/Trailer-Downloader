@@ -36,7 +36,7 @@ python3 /path/to/script/Trailer-Downloader-36
 ```
 Or:
 ```sh
-python3 /path/to/script/Trailer-Downloader-27
+python /path/to/script/Trailer-Downloader-27
 ```
 
 ### folder naming scheme required for the script:
