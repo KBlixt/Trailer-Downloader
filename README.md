@@ -1,3 +1,5 @@
+# This script is not maintained. I'd recommend my other script for this purpouse: [Movie-Extra-Downloader](https://github.com/KBlixt/Movie-Extra-Downloader)
+
 # Trailer-Downloader
 
 This script will go through your movie library and search for a trailer on youtube and download the best one (hopefully).
